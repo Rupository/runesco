@@ -9,7 +9,7 @@ Rust is an excellent programming language for emulation, as it allows for
 - Memory safety, allowing for ease in debugging and preventing potential errors before they can occur
 - Concurrency, crucial for emulation of parallel tasks on a single CPU, as well as for minimal latency for multiplayer 
 ##### [Web Assembly](https://webassembly.org/) 🕸️
-WebAssembly is a assembly-like language with near-native performance and provides a language like Rust a compilation target so that it can run on the web. This would allow crossplay between any platform with a modern browser, preventing having to ensure compability between operating systems.
+WebAssembly (wasm) is a assembly-like language with near-native performance and provides a language like Rust a compilation target so that it can run on the web. This would allow crossplay between any platform with a modern browser, preventing having to ensure compability between operating systems.
 ##### [Matchbox](https://github.com/johanhelsing/matchbox) 🔥
 Matchbox is a rust based tool which allows users to use peer-to-peer WebRTC (Web Real-Time-Communication) networking for rust's native and wasm applications, in order to facilitate low-latency game.
 
