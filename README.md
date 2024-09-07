@@ -1,3 +1,3 @@
 # 🕹️ RuNESCo 🎮
 
-An NES emulator written in Rust, with support for online co-op using WebAssembly and WebRTC.rs (?)
+An NES emulator written in Rust, supporting online co-op using WebAssembly and Matchbox.
