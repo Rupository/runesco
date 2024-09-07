@@ -23,7 +23,7 @@ Matchbox is a rust based tool which allows users to use peer-to-peer WebRTC (Web
 - [ ] Stylish CSS for the website
 
 ---
-# Credits 🖋️
+## Credits 🖋️
 
 - [Rafael Bagmanov](https://github.com/bugzmanov/), for his tutorial on '[Writing \[an\] NES Emulator in Rust](https://bugzmanov.github.io/nes_ebook/chapter_1.html)'.
 - The [Nesdev](https://www.nesdev.org/wiki/Nesdev_Wiki) Wiki and its contributors, for every resource imaginable.
