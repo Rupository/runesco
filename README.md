@@ -28,4 +28,4 @@ Matchbox is a rust based tool which allows users to use peer-to-peer WebRTC (Web
 - [Rafael Bagmanov](https://github.com/bugzmanov/), for his tutorial on '[Writing \[an\] NES Emulator in Rust](https://bugzmanov.github.io/nes_ebook/chapter_1.html)'.
 - The [Nesdev](https://www.nesdev.org/wiki/Nesdev_Wiki) Wiki and its contributors, for every resource imaginable.
 - [Rodrigo Alfonso](https://github.com/afska) for [NEStation](https://github.com/afska/nestation#nestation), the [inspiration](https://forums.nesdev.org/viewtopic.php?t=19090) for the multiplayer implementation.
-- [Johan Klokkhammer Helsing](https://github.com/johanhelsing) for [Matchbox](https://github.com/johanhelsing/matchbox), without which I'd have to learn [WebRTC](https://webrtc.org/) / [WebRTC.rs](https://github.com/webrtc-rs/webrtc) on my own
+- [Johan Klokkhammer Helsing](https://github.com/johanhelsing) for [Matchbox](https://github.com/johanhelsing/matchbox), without which I'd have to learn [WebRTC](https://webrtc.org/) / [WebRTC.rs](https://github.com/webrtc-rs/webrtc) on my own.
