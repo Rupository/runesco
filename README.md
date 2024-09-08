@@ -7,7 +7,7 @@ The idea for ruNESco started during the lockdown with a personal fascination wit
 Rust is an excellent programming language for emulation, as it allows for
 - Enhanced performance, allowing for faster emulation
 - Memory safety, allowing for ease in debugging and preventing potential errors before they can occur
-- Concurrency, crucial for emulation of parallel tasks on a single CPU, as well as for minimal latency for multiplayer 
+- Concurrency, crucial for emulation of parallel tasks on a single CPU, as well as for minimal latency in multiplayer 
 ##### [Web Assembly](https://webassembly.org/) 🕸️
 WebAssembly (wasm) is a assembly-like language with near-native performance and provides a language like Rust a compilation target so that it can run on the web. This would allow crossplay between any platform with a modern browser, preventing having to ensure compability between operating systems.
 ##### [Matchbox](https://github.com/johanhelsing/matchbox) 🔥
