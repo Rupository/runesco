@@ -17,7 +17,7 @@ Matchbox is a rust based tool which allows users to use peer-to-peer WebRTC (Web
 ### Primary Goals 💪
 - [ ] Implement a fully-functional and feature complete NES emulator
 - [ ] Implement basic compilation to a website
-- [ ] Implement 2-4 player Multiplayer (as allowed for by original hardware like the Nintendo Four-Score or the NES Satellite)
+- [ ] Implement 2-4 player multiplayer (as allowed for by original hardware like the Nintendo Four-Score or the NES Satellite)
 ### Stretch Goals 🦾
 - [ ] 4+ players (max limit: 8, or maybe more?)
 - [ ] A prettier website
