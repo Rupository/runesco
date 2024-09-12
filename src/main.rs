@@ -1,4 +1,5 @@
 #![allow(unused_variables)]
+#![allow(dead_code)]
 fn main() {
     pub struct CPU { // CPU with Accumulator A, Status flags [NV_BDIZC], and Program Counter
         pub register_a: u8,
@@ -50,7 +51,7 @@ fn main() {
                         return; 
                     }
 
-                    
+
                     _ => todo!()
                 }
             }
