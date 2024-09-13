@@ -73,7 +73,6 @@ mod test {
        // tests whther N flag is set or not (should be unset)
 
        // [?] Why is 0b00 being used in one case and 0 in the other? Aren't these equivalent?
-       // [A] Formatting: See the third test 
    }
 
     #[test]
