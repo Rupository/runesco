@@ -27,7 +27,7 @@ impl CPU {
 
             match opscode {
 
-                0xA9 => { //LDA
+                0xA9 => { // LDA
                     let param = program[self.program_counter as usize];
                     self.program_counter +=1; // using the parameter takes 1 byte
                     self.register_a = param;
