@@ -1,11 +1,13 @@
 #![allow(unused_variables)]
 #![allow(dead_code)]
 
-pub struct CPU { // CPU with Accumulator A, Status flags [NV_BDIZC], and Program Counter
+pub struct CPU { // CPU with Accumulator A, Register X, Register Y, Status flags [NV_BDIZC], and Program Counter
     pub register_a: u8,
     pub register_x: u8,
+    pub register_y: u8,
     pub status: u8,
     pub program_counter: u16,
+    memory: [u8; 0xFFFF] // ...and 64 Kilobits of total memory space
 }
 
 impl CPU {
@@ -13,9 +15,64 @@ impl CPU {
         CPU {
             register_a: 0,
             register_x: 0,
+            register_y: 0,
             status: 0,
             program_counter: 0,
+            memory: [0; 0xFFFF]
         }
+    }
+
+    fn mem_read(&self, addr: u16) -> u8 { // returns next 8 bit integer instruction
+        self.memory[addr as usize] // from a 16 bit address, and converts to usize (compatibility)
+    }
+
+    fn mem_read_u16(&mut self, pos: u16) -> u16 { // read little endian
+        let lo = self.mem_read(pos) as u16;
+        let hi = self.mem_read(pos + 1) as u16;
+        (hi << 8) | (lo as u16) // left shift hi to put it ahead and then
+        // combine with bitwise OR
+    }
+
+    fn mem_read_u16_alt(&mut self, pos: u16) -> u16 {
+        let lo = self.mem_read(pos);
+        let hi = self.mem_read(pos + 1);
+        u16::from_le_bytes([lo,hi])
+    }
+
+    fn mem_write(&mut self, addr: u16, data: u8) { // writes data to an address in memory
+        self.memory[addr as usize] = data; 
+    }
+
+    fn mem_write_u16(&mut self, pos: u16, data: u16) { // write little endian
+        let hi = (data >> 8) as u8; 
+        let lo = (data & 0xff) as u8;
+        self.mem_write(pos, lo);
+        self.mem_write(pos + 1, hi);
+    }
+
+    // [?] Why is mem_read_u16 reading values in u16 but mem_write_u16 is 
+    // storing values as u8?
+
+    // [A] Because processing is done by combining two u8 instructions, 
+    // and converting them to u16 to perform binary arithmetic is easier.
+    // Additionally, instructions to be processed after reading must be in u16.
+
+    // However, write uses u8 as the memory array stores only u8 values.
+    // [To-do]: Test mem_read_u16_alt which keeps u8 consitency with write.
+
+    pub fn reset(&mut self) { // resets when new cartridge is loaded
+        self.register_a = 0;
+        self.register_x = 0;
+        self.status = 0;
+ 
+        self.program_counter = self.mem_read_u16(0xFFFC);
+    }
+
+    pub fn load(&mut self, program: Vec<u8>) {
+        self.memory[0x8000 .. (0x8000 + program.len())].copy_from_slice(&program[..]);
+        // Memory will be written (by slicing) from address 0x8000 to 0xXXXX, depending on program
+        self.mem_write_u16(0xFFFC, 0x8000); // program counter, stored in 0xFFFC 
+        // is set to 0x8000
     }
 
     fn update_zero_and_negative_flags(&mut self, result: u8) {
@@ -57,28 +114,24 @@ impl CPU {
         self.update_zero_and_negative_flags(self.register_x);
         // note: Carry is NOT USED! Addition is in modulo 0xff, loops back to 0.
     }
-   
     
-    pub fn interpret(&mut self, program: Vec<u8>) { // Reads instructions given in machine code: 
-        // Eg. interpret([a9, c0, aa, e8, 00]) 
-        self.program_counter = 0;
-
+    pub fn run(&mut self) {
+        
         loop {
-            let opscode = program[self.program_counter as usize]; // usize as it decides
-            // based on native architecture, allowing compatibility 
+            let opscode = self.mem_read(self.program_counter); 
             self.program_counter +=1; // reading the opcode takes 1 byte
 
             match opscode {
 
                 0xA9 => { // LDA
-                    let param = program[self.program_counter as usize];
+                    let param = self.memory[self.program_counter as usize];
                     self.program_counter +=1; // using the parameter takes 1 byte
                     self.lda(param)
     
                 }
 
                 0xAA =>  { // TAX
-                    self.tax()
+                    self.tax() 
                 }
 
                 0x00 => { // BRK
@@ -94,6 +147,12 @@ impl CPU {
             }
         }
     }
+
+    pub fn load_and_run(&mut self, program: Vec<u8>) {
+        self.load(program);
+        self.reset();
+        self.run()
+    }
 }
 
 #[cfg(test)]
@@ -103,7 +162,7 @@ mod test {
    #[test]
    fn test_0xa9_lda_immediate_load_data() {
        let mut cpu = CPU::new();
-       cpu.interpret(vec![0xa9, 0x05, 0x00]);
+       cpu.load_and_run(vec![0xa9, 0x05, 0x00]);
        assert_eq!(cpu.register_a, 0x05);
        assert!(cpu.status & 0b0000_0010 == 0b00); // since A =/= 0, tests whether Z flag is set or not 
        // (should be unset)
@@ -117,7 +176,7 @@ mod test {
     #[test]
     fn test_0xa9_lda_zero_flag() {
         let mut cpu = CPU::new();
-        cpu.interpret(vec![0xa9, 0x00, 0x00]);
+        cpu.load_and_run(vec![0xa9, 0x00, 0x00]);
         assert!(cpu.status & 0b0000_0010 == 0b10); // since A = 0, tests whether Z flag 
         // is set or not (should be set)
     }
@@ -125,7 +184,7 @@ mod test {
     #[test]
     fn test_0xa9_lda_neg_flag() {
         let mut cpu = CPU::new();
-        cpu.interpret(vec![0xa9, 0x80, 0x00]);
+        cpu.load_and_run(vec![0xa9, 0x80, 0x00]);
         assert!(cpu.status & 0b1000_0000 == 0b1000_0000); // since 7th bit of A is set, 
         // tests whther N flag is set or not (should be set)
     }
@@ -133,15 +192,14 @@ mod test {
     #[test]
     fn test_0xaa_tax_move_a_to_x() {
         let mut cpu = CPU::new();
-        cpu.register_a = 10;
-        cpu.interpret(vec![0xaa, 0x00]);
-        assert_eq!(cpu.register_x, 10)
+        cpu.load_and_run(vec![0xa9, 0x0a, 0xaa, 0x00]);
+        assert_eq!(cpu.register_x, cpu.register_a)
     }
 
     #[test]
     fn test_0xaa_txa_zero_flag() {
         let mut cpu = CPU::new();
-        cpu.interpret(vec![0xa9, 0x00, 0xaa, 0x00]);
+        cpu.load_and_run(vec![0xa9, 0x00, 0xaa, 0x00]);
         assert!(cpu.status & 0b0000_0010 == 0b10); // since A = 0, and then X = 0,
         // tests whether Z flag is set or not (should be set)
     }
@@ -149,27 +207,25 @@ mod test {
     #[test]
     fn test_0xaa_txa_neg_flag() {
         let mut cpu = CPU::new();
-        cpu.interpret(vec![0xa9, 0x80, 0xaa, 0x00]);
+        cpu.load_and_run(vec![0xa9, 0x80, 0xaa, 0x00]);
         assert!(cpu.status & 0b1000_0000 == 0b1000_0000); // since A has 7th bit set, and then so does X,
         // tests whether N flag is set or not (should be set)
     }
 
     #[test]
+    fn test_inx_overflow() {
+        let mut cpu = CPU::new();
+        cpu.load_and_run(vec![0xa9, 0xff, 0xaa, 0xe8, 0xe8, 0x00]);
+        assert_eq!(cpu.register_x, 1)
+    }
+
+    #[test]
    fn test_5_ops_working_together() {
        let mut cpu = CPU::new();
-       cpu.interpret(vec![0xa9, 0xc0, 0xaa, 0xe8, 0x00]);
+       cpu.load_and_run(vec![0xa9, 0xc0, 0xaa, 0xe8, 0x00]);
  
        assert_eq!(cpu.register_x, 0xc1)
    }
-
-    #[test]
-    fn test_inx_overflow() {
-        let mut cpu = CPU::new();
-        cpu.register_x = 0xff;
-        cpu.interpret(vec![0xe8, 0xe8, 0x00]);
-
-        assert_eq!(cpu.register_x, 1)
-    }
 }
 
 fn main () {
