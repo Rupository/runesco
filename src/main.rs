@@ -26,14 +26,7 @@ impl CPU {
         self.memory[addr as usize] // from a 16 bit address, and converts to usize (compatibility)
     }
 
-    fn mem_read_u16(&mut self, pos: u16) -> u16 { // read little endian
-        let lo = self.mem_read(pos) as u16;
-        let hi = self.mem_read(pos + 1) as u16;
-        (hi << 8) | (lo as u16) // left shift hi to put it ahead and then
-        // combine with bitwise OR
-    }
-
-    fn mem_read_u16_alt(&mut self, pos: u16) -> u16 {
+    fn mem_read_u16(&mut self, pos: u16) -> u16 {
         let lo = self.mem_read(pos);
         let hi = self.mem_read(pos + 1);
         u16::from_le_bytes([lo,hi])
