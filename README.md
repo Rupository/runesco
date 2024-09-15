@@ -1,4 +1,4 @@
-# 🕹️ ruNESco 🎮
+# 🕹️ ruNESco
 
 An emulator for the [Nintendo Entertainment System (NES)](https://en.wikipedia.org/wiki/Nintendo_Entertainment_System) written in [Rust](https://www.rust-lang.org/), which supports cooperative online multiplayer over any modern web browser using [Web Assembly](https://webassembly.org/), and peer-to-peer communication through [Matchbox.](https://github.com/johanhelsing/matchbox)
 
