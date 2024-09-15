@@ -26,7 +26,7 @@ impl CPU {
         self.memory[addr as usize] // from a 16 bit address, and converts to usize (compatibility)
     }
 
-    fn mem_read_u16(&mut self, pos: u16) -> u16 {
+    fn mem_read_u16(&mut self, pos: u16) -> u16 { // read little endian, u8 + u8 = u16
         let lo = self.mem_read(pos);
         let hi = self.mem_read(pos + 1);
         u16::from_le_bytes([lo,hi])
@@ -36,22 +36,12 @@ impl CPU {
         self.memory[addr as usize] = data; 
     }
 
-    fn mem_write_u16(&mut self, pos: u16, data: u16) { // write little endian
+    fn mem_write_u16(&mut self, pos: u16, data: u16) { // write little endian, u16 data written as u8 + u8
         let hi = (data >> 8) as u8; 
         let lo = (data & 0xff) as u8;
         self.mem_write(pos, lo);
         self.mem_write(pos + 1, hi);
     }
-
-    // [?] Why is mem_read_u16 reading values in u16 but mem_write_u16 is 
-    // storing values as u8?
-
-    // [A] Because processing is done by combining two u8 instructions, 
-    // and converting them to u16 to perform binary arithmetic is easier.
-    // Additionally, instructions to be processed after reading must be in u16.
-
-    // However, write uses u8 as the memory array stores only u8 values.
-    // [To-do]: Test mem_read_u16_alt which keeps u8 consitency with write.
 
     pub fn reset(&mut self) { // resets when new cartridge is loaded
         self.register_a = 0;
