@@ -46,14 +46,6 @@ impl CPU {
         let hi = self.mem_read(pos + 1) as u16;
         (hi << 8) | (lo as u16)
     }
-
-    // "Technically, mem_read_u16 doesn't need &mut self and can use immutable reference.
-    // But, mem_read requests could be routed to external "devices" (such as PPU and Joypads), 
-    // where reading does indeed modify the state of the simulated device."
-
-    // [?] However, doing this makes the Addressing Mode implementation (later) break as it uses an immutable reference.
-    // How does one ensure this capacity for potential modification while also maintining immutability?
-    // Either remove mutability here or add mutable reference to addressing modes.
     
     fn mem_write(&mut self, addr: u16, data: u8) { // writes data to an address in memory
         self.memory[addr as usize] = data; 
@@ -135,8 +127,6 @@ impl CPU {
             }
         }
     }
-
-    // [A] The book later updates the above to have a mutable reference.
 
     fn update_zero_and_negative_flags(&mut self, result: u8) {
 
