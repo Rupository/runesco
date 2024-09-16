@@ -1,0 +1,373 @@
+use std::collections::HashMap;
+use crate::opcodes;
+
+
+pub struct CPU { // CPU with Accumulator A, Register X, Register Y, Status flags [NV_BDIZC], and Program Counter
+    pub register_a: u8,
+    pub register_x: u8,
+    pub register_y: u8,
+    pub status: u8,
+    pub program_counter: u16,
+    memory: [u8; 0xFFFF] // ...and 64 Kilobits of total memory space
+}
+
+#[derive(Debug)]
+#[allow(non_camel_case_types)]
+pub enum AddressingMode {
+    // Specifically, addressing modes that are not implied, relative, or indirect
+    // which can be done implicitly with opcode implementation.
+   Immediate,
+   ZeroPage,
+   ZeroPage_X,
+   ZeroPage_Y,
+   Absolute,
+   Absolute_X,
+   Absolute_Y,
+   Indirect_X,
+   Indirect_Y,
+   NoneAddressing,
+}
+
+impl CPU {
+    pub fn new() -> Self {
+        CPU {
+            register_a: 0,
+            register_x: 0,
+            register_y: 0,
+            status: 0,
+            program_counter: 0,
+            memory: [0; 0xFFFF]
+        }
+    }
+
+    fn mem_read(&self, addr: u16) -> u8 { // returns next 8 bit integer instruction
+        self.memory[addr as usize] // from a 16 bit address, and converts to usize (compatibility)
+    }
+
+    fn mem_read_u16(&mut self, pos: u16) -> u16 {
+        let lo = self.mem_read(pos);
+        let hi = self.mem_read(pos + 1);
+        u16::from_le_bytes([lo,hi]) // Converts to full memory address: $hilo
+    }
+    
+    fn mem_write(&mut self, addr: u16, data: u8) { // writes data to an address in memory
+        self.memory[addr as usize] = data; 
+    }
+
+    fn mem_write_u16(&mut self, pos: u16, data: u16) { // write little endian, u16 data written as u8 + u8
+        let hi = (data >> 8) as u8; 
+        let lo = (data & 0xff) as u8;
+        self.mem_write(pos, lo);
+        self.mem_write(pos + 1, hi);
+    }
+
+    pub fn reset(&mut self) { // resets when new cartridge is loaded
+        self.register_a = 0;
+        self.register_x = 0;
+        self.status = 0;
+ 
+        self.program_counter = self.mem_read_u16(0xFFFC);
+    }
+
+    pub fn load(&mut self, program: Vec<u8>) {
+        self.memory[0x8000 .. (0x8000 + program.len())].copy_from_slice(&program[..]);
+        // Memory will be written (by slicing) from address 0x8000 to 0xXXXX, depending on program
+        self.mem_write_u16(0xFFFC, 0x8000); // program counter, stored in 0xFFFC 
+        // is set to 0x8000
+    }
+
+    fn get_operand_address(&mut self, mode: &AddressingMode) -> u16 {
+
+        match mode {
+            AddressingMode::Immediate => self.program_counter, // Not really an addressing mode:
+            // gives whatever hex value is in the instruction as the value to be used.
+ 
+            AddressingMode::ZeroPage  => self.mem_read(self.program_counter) as u16,
+            // Gets u8 address from program counter, of which only 
+            // the last two bits of converted the u16 will be relevant.
+            // Only access first 256 bytes of memory
+    
+            AddressingMode::Absolute => self.mem_read_u16(self.program_counter),
+            // full u16 address is read, can access 0-65536 bytes.
+         
+            AddressingMode::ZeroPage_X => { 
+                // Takes 0-page address and adds the value stored
+                // in the X register to it. Wraps around if $ff, X (X>0)
+                let pos = self.mem_read(self.program_counter);
+                let addr = pos.wrapping_add(self.register_x) as u16;
+                addr
+            }
+            AddressingMode::ZeroPage_Y => {
+                // See 0-page X
+                let pos = self.mem_read(self.program_counter);
+                let addr = pos.wrapping_add(self.register_y) as u16;
+                addr
+            }
+ 
+            AddressingMode::Absolute_X => {
+                // Takes absolute address and adds the value stored
+                // in the X register to it. Wraps around if $ff, X (X>0)
+                let base = self.mem_read_u16(self.program_counter);
+                let addr = base.wrapping_add(self.register_x as u16);
+                addr
+            }
+            AddressingMode::Absolute_Y => {
+                // See absolute X
+                let base = self.mem_read_u16(self.program_counter);
+                let addr = base.wrapping_add(self.register_y as u16);
+                addr
+            }
+ 
+            AddressingMode::Indirect_X => {
+                // Gets a 0-page memory address
+                let base = self.mem_read(self.program_counter);
+ 
+                let ptr: u8 = (base as u8).wrapping_add(self.register_x); // adds what's in X to it
+                let lo = self.mem_read(ptr as u16); // reads what's at the pointer
+                let hi = self.mem_read(ptr.wrapping_add(1) as u16); // and then at pointer + 1
+                (hi as u16) << 8 | (lo as u16) // converts to full memory address $hilo
+                // [Test] u16::from_le_bytes([lo,hi])
+            }
+            AddressingMode::Indirect_Y => {
+                // Gets a 0-page memory address
+                let base = self.mem_read(self.program_counter);
+ 
+                let lo = self.mem_read(base as u16); // reads what's at pointer 
+                let hi = self.mem_read((base as u8).wrapping_add(1) as u16); // reads whats at pointer + 1
+                let deref_base = (hi as u16) << 8 | (lo as u16); // combines into full address, dereferncing base
+                // [Test] u16::from_le_bytes([lo,hi])
+                let deref = deref_base.wrapping_add(self.register_y as u16); // adds whats's in Y to deref-ed address.
+                deref
+            }
+          
+            AddressingMode::NoneAddressing => {
+                panic!("mode {:?} is not supported", mode);
+            }
+        }
+    }
+
+    fn update_zero_and_negative_flags(&mut self, result: u8) {
+
+        if result == 0 { // if register = 0
+            self.status = self.status | 0b0000_0010; 
+            // Z (zero flag) set to 1 with bitwise OR
+        } else {
+            self.status = self.status & 0b1111_1101;
+            //otherwise, bitwise AND keeps everything else the same 
+            //and sets Z to 0.
+        }
+
+        if result & 0b1000_0000 != 0 { // if 7th (last) bit of register is set, checked w/ bitwise AND
+            self.status = self.status | 0b1000_0000; 
+            // N (negative flag) is set to 1 with bitwise OR
+        } else {
+            self.status = self.status & 0b0111_1111;
+            // N (negative flag) is set to 0  with bitwise AND
+        }
+    }
+
+    fn lda(&mut self, mode: &AddressingMode) {
+        let addr = self.get_operand_address(mode);
+        let value = self.mem_read(addr);
+       
+        self.register_a = value;
+        self.update_zero_and_negative_flags(self.register_a);
+    }
+  
+    fn tax(&mut self) {
+        self.register_x = self.register_a;
+        self.update_zero_and_negative_flags(self.register_x);
+    }
+
+    fn inx(&mut self) {
+        if self.register_x == 0xff { 
+            self.register_x = 0;
+        } else {
+            self.register_x += 1;
+        }
+        self.update_zero_and_negative_flags(self.register_x);
+        // note: Carry is NOT USED! Addition is in modulo 0xff, loops back to 0.
+    }
+
+    fn sta(&mut self, mode: &AddressingMode) {
+        let addr = self.get_operand_address(mode);
+        self.mem_write(addr, self.register_a);
+    }
+    
+    pub fn run(&mut self) {
+        
+        loop {
+            let opscode = self.mem_read(self.program_counter); 
+            self.program_counter +=1; // reading the opcode takes 1 byte
+
+            match opscode {
+
+                // LDA
+                0xA9 => {
+                    self.lda(&AddressingMode::Immediate);
+                    self.program_counter += 1;
+                }
+                0xA5 => {
+                    self.lda(&AddressingMode::ZeroPage);
+                    self.program_counter += 1;
+                }
+                0xAD => {
+                    self.lda(&AddressingMode::Absolute);
+                    self.program_counter += 2; 
+                }
+                0xB5 => {
+                    self.lda(&AddressingMode::ZeroPage_X);
+                    self.program_counter +=1;
+                }
+                0xBD => {
+                    self.lda(&AddressingMode::Absolute_X);
+                    self.program_counter +=2;
+                }
+                0xB9 => {
+                    self.lda(&AddressingMode::Absolute_Y);
+                    self.program_counter +=2;
+                }
+                0xA1 => {
+                    self.lda(&AddressingMode::Indirect_X);
+                    self.program_counter +=1;
+                }
+                0xB1 => {
+                    self.lda(&AddressingMode::Indirect_Y);
+                    self.program_counter +=1;
+                }
+
+                // STA
+                0x85 => {
+                    self.sta(&AddressingMode::ZeroPage);
+                    self.program_counter += 1;
+                }
+                0x95 => {
+                    self.sta(&AddressingMode::ZeroPage_X);
+                    self.program_counter += 1;
+                }
+                0x8D => {
+                    self.sta(&AddressingMode::Absolute);
+                    self.program_counter += 3;
+                }
+                0x9D => {
+                    self.sta(&AddressingMode::Absolute_X);
+                    self.program_counter += 3;
+                }
+                0x99 => {
+                    self.sta(&AddressingMode::Absolute_Y);
+                    self.program_counter += 3;
+                }
+                0x81 => {
+                    self.sta(&AddressingMode::Indirect_X);
+                    self.program_counter += 1;
+                }
+                0x91 => {
+                    self.sta(&AddressingMode::Indirect_Y);
+                    self.program_counter += 1;
+                }
+
+
+                0xAA =>  { // TAX
+                    self.tax() 
+                }
+
+                0x00 => { // BRK
+                    return; 
+                }
+
+                0xE8 => { // INX
+                    self.inx()
+                }
+
+
+                _ => todo!()
+            }
+        }
+    }
+
+    pub fn load_and_run(&mut self, program: Vec<u8>) {
+        self.load(program);
+        self.reset();
+        self.run()
+    }
+}
+
+#[cfg(test)]
+mod test {
+   use super::*;
+ 
+   #[test]
+   fn test_0xa9_lda_immediate_load_data() {
+       let mut cpu = CPU::new();
+       cpu.load_and_run(vec![0xa9, 0x05, 0x00]);
+       assert_eq!(cpu.register_a, 0x05);
+       assert!(cpu.status & 0b0000_0010 == 0b00); // since A =/= 0, tests whether Z flag is set or not 
+       // (should be unset)
+       assert!(cpu.status & 0b1000_0000 == 0); // since 7th bit of A is not set, 
+       // tests whther N flag is set or not (should be unset)
+   }
+
+    #[test]
+    fn test_0xa9_lda_zero_flag() {
+        let mut cpu = CPU::new();
+        cpu.load_and_run(vec![0xa9, 0x00, 0x00]);
+        assert!(cpu.status & 0b0000_0010 == 0b10); // since A = 0, tests whether Z flag 
+        // is set or not (should be set)
+    }
+
+    #[test]
+    fn test_0xa9_lda_neg_flag() {
+        let mut cpu = CPU::new();
+        cpu.load_and_run(vec![0xa9, 0x80, 0x00]);
+        assert!(cpu.status & 0b1000_0000 == 0b1000_0000); // since 7th bit of A is set, 
+        // tests whther N flag is set or not (should be set)
+    }
+
+    #[test]
+    fn test_0xaa_tax_move_a_to_x() {
+        let mut cpu = CPU::new();
+        cpu.load_and_run(vec![0xa9, 0x0a, 0xaa, 0x00]);
+        assert_eq!(cpu.register_x, cpu.register_a)
+    }
+
+    #[test]
+    fn test_0xaa_txa_zero_flag() {
+        let mut cpu = CPU::new();
+        cpu.load_and_run(vec![0xa9, 0x00, 0xaa, 0x00]);
+        assert!(cpu.status & 0b0000_0010 == 0b10); // since A = 0, and then X = 0,
+        // tests whether Z flag is set or not (should be set)
+    }
+
+    #[test]
+    fn test_0xaa_txa_neg_flag() {
+        let mut cpu = CPU::new();
+        cpu.load_and_run(vec![0xa9, 0x80, 0xaa, 0x00]);
+        assert!(cpu.status & 0b1000_0000 == 0b1000_0000); // since A has 7th bit set, and then so does X,
+        // tests whether N flag is set or not (should be set)
+    }
+
+    #[test]
+    fn test_inx_overflow() {
+        let mut cpu = CPU::new();
+        cpu.load_and_run(vec![0xa9, 0xff, 0xaa, 0xe8, 0xe8, 0x00]);
+        assert_eq!(cpu.register_x, 1)
+    }
+
+    #[test]
+   fn test_5_ops_working_together() {
+       let mut cpu = CPU::new();
+       cpu.load_and_run(vec![0xa9, 0xc0, 0xaa, 0xe8, 0x00]);
+ 
+       assert_eq!(cpu.register_x, 0xc1)
+   }
+
+   #[test]
+   fn test_lda_from_memory() {
+       let mut cpu = CPU::new();
+       cpu.mem_write(0x10, 0x55);
+
+       cpu.load_and_run(vec![0xa5, 0x10, 0x00]);
+
+       assert_eq!(cpu.register_a, 0x55);
+   }
+}
