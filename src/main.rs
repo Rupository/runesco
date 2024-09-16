@@ -12,7 +12,9 @@ pub struct CPU { // CPU with Accumulator A, Register X, Register Y, Status flags
 
 #[derive(Debug)] //
 #[allow(non_camel_case_types)]
-pub enum AddressingMode {
+pub enum AddressingMode { 
+    // Specifically, addressing modes that are not implied, relative, or indirect
+    // which can be done implicitly with opcode implementation.
    Immediate,
    ZeroPage,
    ZeroPage_X,
@@ -42,9 +44,9 @@ impl CPU {
     }
 
     fn mem_read_u16(&mut self, pos: u16) -> u16 {
-        let lo = self.mem_read(pos) as u16;
-        let hi = self.mem_read(pos + 1) as u16;
-        (hi << 8) | (lo as u16)
+        let lo = self.mem_read(pos);
+        let hi = self.mem_read(pos + 1);
+        u16::from_le_bytes([lo,hi]) // Converts to full memory address: $hilo
     }
     
     fn mem_write(&mut self, addr: u16, data: u8) { // writes data to an address in memory
@@ -76,49 +78,64 @@ impl CPU {
     fn get_operand_address(&mut self, mode: &AddressingMode) -> u16 {
 
         match mode {
-            AddressingMode::Immediate => self.program_counter,
+            AddressingMode::Immediate => self.program_counter, // Not really an addressing mode:
+            // gives whatever hex value is in the instruction as the value to be used.
  
             AddressingMode::ZeroPage  => self.mem_read(self.program_counter) as u16,
-           
+            // Gets u8 address from program counter, of which only 
+            // the last two bits of converted the u16 will be relevant.
+            // Only access first 256 bytes of memory
+    
             AddressingMode::Absolute => self.mem_read_u16(self.program_counter),
+            // full u16 address is read, can access 0-65536 bytes.
          
-            AddressingMode::ZeroPage_X => {
+            AddressingMode::ZeroPage_X => { 
+                // Takes 0-page address and adds the value stored
+                // in the X register to it. Wraps around if $ff, X (X>0)
                 let pos = self.mem_read(self.program_counter);
                 let addr = pos.wrapping_add(self.register_x) as u16;
                 addr
             }
             AddressingMode::ZeroPage_Y => {
+                // See 0-page X
                 let pos = self.mem_read(self.program_counter);
                 let addr = pos.wrapping_add(self.register_y) as u16;
                 addr
             }
  
             AddressingMode::Absolute_X => {
+                // Takes absolute address and adds the value stored
+                // in the X register to it. Wraps around if $ff, X (X>0)
                 let base = self.mem_read_u16(self.program_counter);
                 let addr = base.wrapping_add(self.register_x as u16);
                 addr
             }
             AddressingMode::Absolute_Y => {
+                // See absolute X
                 let base = self.mem_read_u16(self.program_counter);
                 let addr = base.wrapping_add(self.register_y as u16);
                 addr
             }
  
             AddressingMode::Indirect_X => {
+                // Gets a 0-page memory address
                 let base = self.mem_read(self.program_counter);
  
-                let ptr: u8 = (base as u8).wrapping_add(self.register_x);
-                let lo = self.mem_read(ptr as u16);
-                let hi = self.mem_read(ptr.wrapping_add(1) as u16);
-                (hi as u16) << 8 | (lo as u16)
+                let ptr: u8 = (base as u8).wrapping_add(self.register_x); // adds what's in X to it
+                let lo = self.mem_read(ptr as u16); // reads what's at the pointer
+                let hi = self.mem_read(ptr.wrapping_add(1) as u16); // and then at pointer + 1
+                (hi as u16) << 8 | (lo as u16) // converts to full memory address $hilo
+                // [Test] u16::from_le_bytes([lo,hi])
             }
             AddressingMode::Indirect_Y => {
+                // Gets a 0-page memory address
                 let base = self.mem_read(self.program_counter);
  
-                let lo = self.mem_read(base as u16);
-                let hi = self.mem_read((base as u8).wrapping_add(1) as u16);
-                let deref_base = (hi as u16) << 8 | (lo as u16);
-                let deref = deref_base.wrapping_add(self.register_y as u16);
+                let lo = self.mem_read(base as u16); // reads what's at pointer 
+                let hi = self.mem_read((base as u8).wrapping_add(1) as u16); // reads whats at pointer + 1
+                let deref_base = (hi as u16) << 8 | (lo as u16); // combines into full address, dereferncing base
+                // [Test] u16::from_le_bytes([lo,hi])
+                let deref = deref_base.wrapping_add(self.register_y as u16); // adds whats's in Y to deref-ed address.
                 deref
             }
           
@@ -148,7 +165,10 @@ impl CPU {
         }
     }
 
-    fn lda(&mut self, value: u8) {
+    fn lda(&mut self, mode: &AddressingMode) {
+        let addr = self.get_operand_address(mode);
+        let value = self.mem_read(addr);
+       
         self.register_a = value;
         self.update_zero_and_negative_flags(self.register_a);
     }
@@ -167,6 +187,11 @@ impl CPU {
         self.update_zero_and_negative_flags(self.register_x);
         // note: Carry is NOT USED! Addition is in modulo 0xff, loops back to 0.
     }
+
+    fn sta(&mut self, mode: &AddressingMode) {
+        let addr = self.get_operand_address(mode);
+        self.mem_write(addr, self.register_a);
+    }
     
     pub fn run(&mut self) {
         
@@ -176,12 +201,70 @@ impl CPU {
 
             match opscode {
 
-                0xA9 => { // LDA
-                    let param = self.memory[self.program_counter as usize];
-                    self.program_counter +=1; // using the parameter takes 1 byte
-                    self.lda(param)
-    
+                // LDA
+                0xA9 => {
+                    self.lda(&AddressingMode::Immediate);
+                    self.program_counter += 1;
                 }
+                0xA5 => {
+                    self.lda(&AddressingMode::ZeroPage);
+                    self.program_counter += 1;
+                }
+                0xAD => {
+                    self.lda(&AddressingMode::Absolute);
+                    self.program_counter += 2; 
+                }
+                0xB5 => {
+                    self.lda(&AddressingMode::ZeroPage_X);
+                    self.program_counter +=1;
+                }
+                0xBD => {
+                    self.lda(&AddressingMode::Absolute_X);
+                    self.program_counter +=2;
+                }
+                0xB9 => {
+                    self.lda(&AddressingMode::Absolute_Y);
+                    self.program_counter +=2;
+                }
+                0xA1 => {
+                    self.lda(&AddressingMode::Indirect_X);
+                    self.program_counter +=1;
+                }
+                0xB1 => {
+                    self.lda(&AddressingMode::Indirect_Y);
+                    self.program_counter +=1;
+                }
+
+                // STA
+                0x85 => {
+                    self.sta(&AddressingMode::ZeroPage);
+                    self.program_counter += 1;
+                }
+                0x95 => {
+                    self.sta(&AddressingMode::ZeroPage_X);
+                    self.program_counter += 1;
+                }
+                0x8D => {
+                    self.sta(&AddressingMode::Absolute);
+                    self.program_counter += 3;
+                }
+                0x9D => {
+                    self.sta(&AddressingMode::Absolute_X);
+                    self.program_counter += 3;
+                }
+                0x99 => {
+                    self.sta(&AddressingMode::Absolute_Y);
+                    self.program_counter += 3;
+                }
+                0x81 => {
+                    self.sta(&AddressingMode::Indirect_X);
+                    self.program_counter += 1;
+                }
+                0x91 => {
+                    self.sta(&AddressingMode::Indirect_Y);
+                    self.program_counter += 1;
+                }
+
 
                 0xAA =>  { // TAX
                     self.tax() 
@@ -221,9 +304,6 @@ mod test {
        // (should be unset)
        assert!(cpu.status & 0b1000_0000 == 0); // since 7th bit of A is not set, 
        // tests whther N flag is set or not (should be unset)
-
-       // [?] Why is 0b00 being used in one case and 0 in the other? Aren't these equivalent?
-       // [A] Probably just a choice to highlight the bit not being changed.
    }
 
     #[test]
@@ -278,6 +358,16 @@ mod test {
        cpu.load_and_run(vec![0xa9, 0xc0, 0xaa, 0xe8, 0x00]);
  
        assert_eq!(cpu.register_x, 0xc1)
+   }
+
+   #[test]
+   fn test_lda_from_memory() {
+       let mut cpu = CPU::new();
+       cpu.mem_write(0x10, 0x55);
+
+       cpu.load_and_run(vec![0xa5, 0x10, 0x00]);
+
+       assert_eq!(cpu.register_a, 0x55);
    }
 }
 
