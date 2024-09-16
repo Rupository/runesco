@@ -136,6 +136,8 @@ impl CPU {
         }
     }
 
+    // [A] The book later updates the above to have a mutable reference.
+
     fn update_zero_and_negative_flags(&mut self, result: u8) {
 
         if result == 0 { // if register = 0
