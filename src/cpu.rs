@@ -135,8 +135,8 @@ impl CPU {
                 let ptr: u8 = (base as u8).wrapping_add(self.register_x); // adds what's in X to it
                 let lo = self.mem_read(ptr as u16); // reads what's at the pointer
                 let hi = self.mem_read(ptr.wrapping_add(1) as u16); // and then at pointer + 1
-                (hi as u16) << 8 | (lo as u16) // converts to full memory address $hilo
-                // [Test] u16::from_le_bytes([lo,hi])
+                u16::from_le_bytes([lo,hi]) // converts to full memory address $hilo
+                
             }
             AddressingMode::Indirect_Y => {
                 // Gets a 0-page memory address
@@ -144,8 +144,7 @@ impl CPU {
  
                 let lo = self.mem_read(base as u16); // reads what's at pointer 
                 let hi = self.mem_read((base as u8).wrapping_add(1) as u16); // reads whats at pointer + 1
-                let deref_base = (hi as u16) << 8 | (lo as u16); // combines into full address, dereferncing base
-                // [Test] u16::from_le_bytes([lo,hi])
+                let deref_base = u16::from_le_bytes([lo,hi]); // combines into full address, dereferncing base
                 let deref = deref_base.wrapping_add(self.register_y as u16); // adds whats's in Y to deref-ed address.
                 deref
             }
