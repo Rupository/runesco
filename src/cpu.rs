@@ -28,7 +28,38 @@ pub enum AddressingMode {
    NoneAddressing,
 }
 
+trait Mem {
+    fn mem_read(&self, addr: u16) -> u8; 
+
+    fn mem_write(&mut self, addr: u16, data: u8);
+    
+    fn mem_read_u16(&mut self, pos: u16) -> u16 {
+        let lo = self.mem_read(pos);
+        let hi = self.mem_read(pos + 1);
+        u16::from_le_bytes([lo,hi]) // Converts to full memory address: $hilo
+    }
+
+    fn mem_write_u16(&mut self, pos: u16, data: u16) { // write little endian, u16 data written as u8 + u8
+        let hi = (data >> 8) as u8; 
+        let lo = (data & 0xff) as u8;
+        self.mem_write(pos, lo);
+        self.mem_write(pos + 1, hi);
+    }
+}
+
+impl Mem for CPU {
+    
+    fn mem_read(&self, addr: u16) -> u8 { // returns next 8 bit integer instruction
+        self.memory[addr as usize] // from a 16 bit address, and converts to usize (compatibility)
+    }
+
+    fn mem_write(&mut self, addr: u16, data: u8) { // writes data to an address in memory
+        self.memory[addr as usize] = data; 
+    }
+}
+
 impl CPU {
+    
     pub fn new() -> Self {
         CPU {
             register_a: 0,
@@ -38,27 +69,6 @@ impl CPU {
             program_counter: 0,
             memory: [0; 0xFFFF]
         }
-    }
-
-    fn mem_read(&self, addr: u16) -> u8 { // returns next 8 bit integer instruction
-        self.memory[addr as usize] // from a 16 bit address, and converts to usize (compatibility)
-    }
-
-    fn mem_read_u16(&mut self, pos: u16) -> u16 {
-        let lo = self.mem_read(pos);
-        let hi = self.mem_read(pos + 1);
-        u16::from_le_bytes([lo,hi]) // Converts to full memory address: $hilo
-    }
-    
-    fn mem_write(&mut self, addr: u16, data: u8) { // writes data to an address in memory
-        self.memory[addr as usize] = data; 
-    }
-
-    fn mem_write_u16(&mut self, pos: u16, data: u16) { // write little endian, u16 data written as u8 + u8
-        let hi = (data >> 8) as u8; 
-        let lo = (data & 0xff) as u8;
-        self.mem_write(pos, lo);
-        self.mem_write(pos + 1, hi);
     }
 
     pub fn reset(&mut self) { // resets when new cartridge is loaded
@@ -195,92 +205,33 @@ impl CPU {
     }
     
     pub fn run(&mut self) {
-        
+        let ref opcodes: HashMap<u8, &'static opcodes::OpCode> = *opcodes::OPCODES_MAP;
+
         loop {
-            let opscode = self.mem_read(self.program_counter); 
-            self.program_counter +=1; // reading the opcode takes 1 byte
+            let code = self.mem_read(self.program_counter);
+            self.program_counter += 1;
+            let program_counter_state = self.program_counter;
 
-            match opscode {
+            let opcode = opcodes.get(&code).expect(&format!("OpCode {:x} is not recognized", code));
 
-                // LDA
-                0xA9 => {
-                    self.lda(&AddressingMode::Immediate);
-                    self.program_counter += 1;
-                }
-                0xA5 => {
-                    self.lda(&AddressingMode::ZeroPage);
-                    self.program_counter += 1;
-                }
-                0xAD => {
-                    self.lda(&AddressingMode::Absolute);
-                    self.program_counter += 2; 
-                }
-                0xB5 => {
-                    self.lda(&AddressingMode::ZeroPage_X);
-                    self.program_counter +=1;
-                }
-                0xBD => {
-                    self.lda(&AddressingMode::Absolute_X);
-                    self.program_counter +=2;
-                }
-                0xB9 => {
-                    self.lda(&AddressingMode::Absolute_Y);
-                    self.program_counter +=2;
-                }
-                0xA1 => {
-                    self.lda(&AddressingMode::Indirect_X);
-                    self.program_counter +=1;
-                }
-                0xB1 => {
-                    self.lda(&AddressingMode::Indirect_Y);
-                    self.program_counter +=1;
+            match code {
+                0xa9 | 0xa5 | 0xb5 | 0xad | 0xbd | 0xb9 | 0xa1 | 0xb1 => {
+                    self.lda(&opcode.mode);
                 }
 
-                // STA
-                0x85 => {
-                    self.sta(&AddressingMode::ZeroPage);
-                    self.program_counter += 1;
+                /* STA */
+                0x85 | 0x95 | 0x8d | 0x9d | 0x99 | 0x81 | 0x91 => {
+                    self.sta(&opcode.mode);
                 }
-                0x95 => {
-                    self.sta(&AddressingMode::ZeroPage_X);
-                    self.program_counter += 1;
-                }
-                0x8D => {
-                    self.sta(&AddressingMode::Absolute);
-                    self.program_counter += 3;
-                }
-                0x9D => {
-                    self.sta(&AddressingMode::Absolute_X);
-                    self.program_counter += 3;
-                }
-                0x99 => {
-                    self.sta(&AddressingMode::Absolute_Y);
-                    self.program_counter += 3;
-                }
-                0x81 => {
-                    self.sta(&AddressingMode::Indirect_X);
-                    self.program_counter += 1;
-                }
-                0x91 => {
-                    self.sta(&AddressingMode::Indirect_Y);
-                    self.program_counter += 1;
-                }
+                
+                0xAA => self.tax(),
+                0xe8 => self.inx(),
+                0x00 => return,
+                _ => todo!(),
+            }
 
-
-                0xAA =>  { // TAX
-                    self.tax() 
-                }
-
-                0x00 => { // BRK
-                    return; 
-                }
-
-                0xE8 => { // INX
-                    self.inx()
-                }
-
-
-                _ => todo!()
+            if program_counter_state == self.program_counter {
+                self.program_counter += (opcode.len - 1) as u16;
             }
         }
     }
