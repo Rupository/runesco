@@ -63,7 +63,9 @@ lazy_static! {
         // Returns hashmap (key w/ value) from type u8 (instruction from memory, like a9 or c0 or aa etc.) with a borrow to its
         // corresponding OpCode data, which is available for the entire program.
         let mut map = HashMap::new();
-        for cpuop in &*CPU_OPS_CODES { // Derefernece the value from the vec! CPU_OP_CODES, and then borrow it.
+        for cpuop in &*CPU_OPS_CODES { // Dereference the value from the vec! CPU_OP_CODES, and then borrow it.
+            // The deref is important as CPU_OP_CODES is a ref (somewhat like &) and thus won't give the values,
+            // instead returning the pointers.
             map.insert(cpuop.code, cpuop); // Map each u8 opcode (value) with the full description of the OpCode (type)
         }
         map
