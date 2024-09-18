@@ -15,7 +15,8 @@ pub struct CPU { // CPU with Accumulator A, Register X, Register Y, Status flags
 #[allow(non_camel_case_types)]
 pub enum AddressingMode {
     // Specifically, addressing modes that are not implied, relative, or indirect
-    // which can be done implicitly with opcode implementation.
+    // which can be done implicitly with opcode implementation. These are covered
+    // under NoneAddressing
    Immediate,
    ZeroPage,
    ZeroPage_X,
