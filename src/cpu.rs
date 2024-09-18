@@ -203,6 +203,14 @@ impl CPU {
         let addr = self.get_operand_address(mode);
         self.mem_write(addr, self.register_a);
     }
+
+    fn and(&mut self, mode: &AddressingMode) {
+        let addr = self.get_operand_address(mode);
+        let value = self.mem_read(addr);
+
+        self.register_a = self.register_a & value;
+        self.update_zero_and_negative_flags(self.register_a);
+    }
     
     pub fn run(&mut self) {
         let ref opcodes: HashMap<u8, &'static opcodes::OpCode> = *opcodes::OPCODES_MAP;
@@ -225,6 +233,10 @@ impl CPU {
 
                 0x85 | 0x95 | 0x8d | 0x9d | 0x99 | 0x81 | 0x91 => {
                     self.sta(&opcode.mode);
+                }
+
+                0x29 | 0x25 | 0x35 | 0x2d | 0x3d | 0x39 | 0x21 | 0x31 => {
+                    self.and(&opcode.mode);
                 }
                 
                 0xAA => self.tax(),
@@ -249,6 +261,13 @@ impl CPU {
 #[cfg(test)]
 mod test {
    use super::*;
+
+   #[test]
+   fn test_0x29_and_immediate_logical_and_bitwise() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0x80, 0x29, 0x01, 0x00]);
+    assert_eq!(cpu.register_a, 0b0000_0000);
+   }
  
    #[test]
    fn test_0xa9_lda_immediate_load_data() {
