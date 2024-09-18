@@ -184,6 +184,22 @@ impl CPU {
         self.register_a = value;
         self.update_zero_and_negative_flags(self.register_a);
     }
+
+    fn ldx(&mut self, mode: &AddressingMode) {
+        let addr = self.get_operand_address(mode);
+        let value = self.mem_read(addr);
+       
+        self.register_x = value;
+        self.update_zero_and_negative_flags(self.register_x);
+    }
+
+    fn ldy(&mut self, mode: &AddressingMode) {
+        let addr = self.get_operand_address(mode);
+        let value = self.mem_read(addr);
+       
+        self.register_y = value;
+        self.update_zero_and_negative_flags(self.register_y);
+    }
   
     fn tax(&mut self) {
         self.register_x = self.register_a;
@@ -295,6 +311,14 @@ impl CPU {
             match code {
                 0xa9 | 0xa5 | 0xb5 | 0xad | 0xbd | 0xb9 | 0xa1 | 0xb1 => {
                     self.lda(&opcode.mode);
+                }
+
+                0xa2 | 0xa6 | 0xb6 | 0xae | 0xbe => {
+                    self.ldx(&opcode.mode);
+                }
+
+                0xa0 | 0xa4 | 0xb4 | 0xac | 0xbc => {
+                    self.ldy(&opcode.mode);
                 }
 
                 0x85 | 0x95 | 0x8d | 0x9d | 0x99 | 0x81 | 0x91 => {
