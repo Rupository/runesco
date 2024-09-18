@@ -190,6 +190,21 @@ impl CPU {
         self.update_zero_and_negative_flags(self.register_x);
     }
 
+    fn tay(&mut self) {
+        self.register_y = self.register_a;
+        self.update_zero_and_negative_flags(self.register_y);
+    }
+
+    fn txa(&mut self) {
+        self.register_a = self.register_x;
+        self.update_zero_and_negative_flags(self.register_a);
+    }
+
+    fn tya(&mut self) {
+        self.register_a = self.register_y;
+        self.update_zero_and_negative_flags(self.register_a);
+    }
+
     fn inx(&mut self) {
         if self.register_x == 0xff { 
             self.register_x = 0;
@@ -198,6 +213,15 @@ impl CPU {
         }
         self.update_zero_and_negative_flags(self.register_x);
         // note: Carry is NOT USED! Addition here is in modulo 0xff, loops back to 0.
+    }
+
+    fn iny(&mut self) {
+        if self.register_y == 0xff { 
+            self.register_y = 0;
+        } else {
+            self.register_y += 1;
+        }
+        self.update_zero_and_negative_flags(self.register_y);
     }
 
     fn sta(&mut self, mode: &AddressingMode) {
@@ -275,8 +299,18 @@ impl CPU {
                     self.asl(&opcode.mode);
                 }
                 
-                0xAA => self.tax(),
+                0xaa => self.tax(),
+
+                0xa8 => self.tay(),
+
+                0x8a => self.txa(),
+
+                0x98 => self.tya(),
+
                 0xe8 => self.inx(),
+
+                0xc8 => self.iny(),
+
                 0x00 => return,
                 _ => todo!(),
             }
