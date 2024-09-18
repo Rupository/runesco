@@ -293,6 +293,32 @@ impl CPU {
             self.update_zero_and_negative_flags(value);
         }
     }
+
+    fn sec(&mut self) {
+        self.status = self.status | 0b0000_0001;
+    }
+
+    fn clc(&mut self) {
+        self.status = self.status & 0b1111_1110;
+    }
+
+    fn sei(&mut self) {
+        self.status = self.status | 0b0000_0100;
+    }
+
+    fn cli(&mut self) {
+        self.status = self.status & 0b1111_1011;
+    }
+
+    fn clv(&mut self) {
+        self.status = self.status & 0b1011_1111;
+    }
+
+    //fn bcc(&mut self) {
+    //    if self.status & 0b0000_0001 == 0b0000_0001 {
+    //        self.program_counter = self.mem_read_u16(self.program_counter + 1);
+    //    }
+    //}
     
     pub fn run(&mut self) {
         let ref opcodes: HashMap<u8, &'static opcodes::OpCode> = *opcodes::OPCODES_MAP;
@@ -353,6 +379,18 @@ impl CPU {
 
                 0xc8 => self.iny(),
 
+                0x38 => self.sec(),
+
+                0x18 => self.clc(),
+
+                0x78 => self.sei(),
+
+                0x58 => self.cli(),
+
+                0xb8 => self.clv(),
+
+                //0x90 => self.bcc(),
+
                 0x00 => return,
                 _ => todo!(),
             }
@@ -375,6 +413,19 @@ impl CPU {
 #[cfg(test)]
 mod test {
    use super::*;
+
+   //#[test]
+   //fn test_0x90_bcc_branch_carry_clear() {
+    
+   //}
+
+   #[test]
+   fn test_non_overflow_sets_and_clears() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0x38, 0x18, 0x78, 0x58, 0x00]);
+    assert!(cpu.status & 0b0000_0001 == 0);
+    assert!(cpu.status & 0b1000_0100 == 0);
+   }
 
    #[test]
    fn test_0x0a_asl_accumulator_left_shift() {
