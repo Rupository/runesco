@@ -2,16 +2,17 @@ use std::collections::HashMap;
 use crate::opcodes;
 
 
-pub struct CPU { // CPU with Accumulator A, Register X, Register Y, Status flags [NV_BDIZC], and Program Counter
-    pub register_a: u8,
-    pub register_x: u8,
-    pub register_y: u8,
-    pub status: u8,
-    pub program_counter: u16,
+pub struct CPU { // CPU with..  
+    pub register_a: u8, // Accumulator A
+    pub register_x: u8, // Register X
+    pub register_y: u8, // Register Y
+    pub status: u8, // Status flags [NV_BDIZC]
+    pub program_counter: u16, // Program Counter
     memory: [u8; 0xFFFF] // ...and 64 Kilobits of total memory space
 }
 
 #[derive(Debug)]
+#[derive(PartialEq)]
 #[allow(non_camel_case_types)]
 pub enum AddressingMode {
     // Specifically, addressing modes that are not implied, relative, or indirect
@@ -34,7 +35,7 @@ trait Mem {
 
     fn mem_write(&mut self, addr: u16, data: u8);
     
-    fn mem_read_u16(&mut self, pos: u16) -> u16 {
+    fn mem_read_u16(&mut self, pos: u16) -> u16 { // read little endian, u8 + u8 data read as u16
         let lo = self.mem_read(pos);
         let hi = self.mem_read(pos + 1);
         u16::from_le_bytes([lo,hi]) // Converts to full memory address: $hilo
@@ -196,7 +197,7 @@ impl CPU {
             self.register_x += 1;
         }
         self.update_zero_and_negative_flags(self.register_x);
-        // note: Carry is NOT USED! Addition is in modulo 0xff, loops back to 0.
+        // note: Carry is NOT USED! Addition here is in modulo 0xff, loops back to 0.
     }
 
     fn sta(&mut self, mode: &AddressingMode) {
@@ -210,6 +211,37 @@ impl CPU {
 
         self.register_a = self.register_a & value;
         self.update_zero_and_negative_flags(self.register_a);
+    }
+
+    fn asl(&mut self, mode: &AddressingMode) {
+
+        if mode == &AddressingMode::NoneAddressing {
+            let value = self.register_a;
+            if value & 0b1000_0000 != 0 { // if 7th (last) bit of register is set, checked w/ bitwise AND
+                self.status = self.status | 0b0000_0001; 
+                // C (carry flag) is set to 1 with bitwise OR
+            } else {
+                self.status = self.status & 0b1111_1110;
+                // C (carry flag) is set to 0  with bitwise AND
+            }
+            self.register_a = value << 1 ;
+            self.update_zero_and_negative_flags(self.register_a);
+
+        } else {
+            let addr = self.get_operand_address(mode);
+            let mut value = self.mem_read(addr);
+            if value & 0b1000_0000 != 0 { // if 7th (last) bit of register is set, checked w/ bitwise AND
+                self.status = self.status | 0b0000_0001; 
+                // C (carry flag) is set to 1 with bitwise OR
+            } else {
+                self.status = self.status & 0b1111_1110;
+                // C (carry flag) is set to 0  with bitwise AND
+            }
+            value = value << 1;
+            self.mem_write(addr, value);
+
+            self.update_zero_and_negative_flags(value);
+        }
     }
     
     pub fn run(&mut self) {
@@ -238,6 +270,10 @@ impl CPU {
                 0x29 | 0x25 | 0x35 | 0x2d | 0x3d | 0x39 | 0x21 | 0x31 => {
                     self.and(&opcode.mode);
                 }
+
+                0x0a | 0x06 | 0x16 | 0x0e | 0x1e => {
+                    self.asl(&opcode.mode);
+                }
                 
                 0xAA => self.tax(),
                 0xe8 => self.inx(),
@@ -245,8 +281,10 @@ impl CPU {
                 _ => todo!(),
             }
 
-            if program_counter_state == self.program_counter {
+            if program_counter_state == self.program_counter { // [?] Why would this ever be false?
                 self.program_counter += (opcode.len - 1) as u16;
+                // Steps to increase program counter by = bytes processed by opcode - 1
+                // -1, because first increase caused by opcode matching is already accounted for. 
             }
         }
     }
@@ -261,6 +299,23 @@ impl CPU {
 #[cfg(test)]
 mod test {
    use super::*;
+
+   #[test]
+   fn test_0x0a_asl_accumulator_left_shift() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0x80, 0x0a, 0x00]);
+    assert_eq!(cpu.register_a, 0);
+    assert!(cpu.status & 0b0000_0001 == 0b0000_0001);
+   }
+
+   #[test]
+   fn test_0x06_asl_from_memory_left_shift() {
+    let mut cpu = CPU::new();
+    cpu.mem_write(0x20, 0x70);
+    cpu.load_and_run(vec![0x06, 0x20, 0x00]);
+    assert_eq!(cpu.mem_read(0x20), 0xe0);
+    assert!(cpu.status & 0b0000_0001 == 0b0000_0000);
+   }
 
    #[test]
    fn test_0x29_and_immediate_logical_and_bitwise() {
