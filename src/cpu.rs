@@ -343,6 +343,37 @@ impl CPU {
         }
     }
 
+    fn lsr(&mut self, mode: &AddressingMode) {
+
+        if mode == &AddressingMode::NoneAddressing {
+            let value = self.register_a;
+            if value & 0b0000_0001 != 0 { // if bit 0 of register is set, checked w/ bitwise AND
+                self.sec(); 
+                // C (carry flag) is set to 1 with bitwise OR, see below
+            } else {
+                self.clc();
+                // C (carry flag) is set to 0  with bitwise AND, see below
+            }
+            self.register_a = value >> 1 ;
+            self.update_zero_and_negative_flags(self.register_a);
+
+        } else {
+            let addr = self.get_operand_address(mode);
+            let mut value = self.mem_read(addr);
+            if value & 0b0000_0001 != 0 { // if bit 0 of register is set, checked w/ bitwise AND
+                self.sec(); 
+                // C (carry flag) is set to 1 with bitwise OR, see below
+            } else {
+                self.clc();
+                // C (carry flag) is set to 0  with bitwise AND, see below
+            }
+            value = value >> 1;
+            self.mem_write(addr, value);
+
+            self.update_zero_and_negative_flags(value);
+        }
+    }
+
     fn sec(&mut self) {
         self.status = self.status | 0b0000_0001;
     }
@@ -416,6 +447,10 @@ impl CPU {
                     self.asl(&opcode.mode);
                 }
 
+                0x4a | 0x46 | 0x56 | 0x4e | 0x5e => {
+                    self.lsr(&opcode.mode);
+                }
+
                 0xc9 | 0xc5 | 0xd5 | 0xcd | 0xdd | 0xd9 | 0xc1 | 0xd1 => {
                     self.cmp(&opcode.mode);
                 }
@@ -486,6 +521,23 @@ mod test {
    //fn test_0x90_bcc_branch_carry_clear() {
     
    //}
+   #[test]
+   fn test_0x4a_lsr_accumulator_left_shift() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0x81, 0x4a, 0x00]);
+    assert_eq!(cpu.register_a, 0x40);
+    assert!(cpu.status & 0b0000_0001 == 0b0000_0001);
+   }
+
+   #[test]
+   fn test_0x46_lsr_from_memory_left_shift() {
+    let mut cpu = CPU::new();
+    cpu.mem_write(0x20, 0x81);
+    cpu.load_and_run(vec![0x46, 0x20, 0x00]);
+    assert_eq!(cpu.mem_read(0x20), 0x40);
+    assert!(cpu.status & 0b0000_0001 == 0b0000_0001);
+   }
+
 
    #[test]
    fn test_0xeo_cpx_comparison_x_immediate() {
