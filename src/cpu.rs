@@ -276,6 +276,22 @@ impl CPU {
         self.update_zero_and_negative_flags(self.register_a);
     }
 
+    fn ora(&mut self, mode: &AddressingMode) {
+        let addr = self.get_operand_address(mode);
+        let value = self.mem_read(addr);
+
+        self.register_a = self.register_a | value;
+        self.update_zero_and_negative_flags(self.register_a);
+    }
+
+    fn eor(&mut self, mode: &AddressingMode) {
+        let addr = self.get_operand_address(mode);
+        let value = self.mem_read(addr);
+
+        self.register_a = self.register_a ^ value;
+        self.update_zero_and_negative_flags(self.register_a);
+    }
+
     fn cmp(&mut self, mode: &AddressingMode) {
         let addr = self.get_operand_address(mode);
         let value = self.mem_read(addr);
@@ -443,6 +459,14 @@ impl CPU {
                     self.and(&opcode.mode);
                 }
 
+                0x09 | 0x05 | 0x15 | 0x0d | 0x1d | 0x19 | 0x01 | 0x11 => {
+                    self.ora(&opcode.mode);
+                }
+
+                0x49 | 0x45 | 0x55 | 0x4d | 0x5d | 0x59 | 0x41 | 0x51 => {
+                    self.eor(&opcode.mode);
+                }
+
                 0x0a | 0x06 | 0x16 | 0x0e | 0x1e => {
                     self.asl(&opcode.mode);
                 }
@@ -521,6 +545,21 @@ mod test {
    //fn test_0x90_bcc_branch_carry_clear() {
     
    //}
+
+   #[test]
+   fn test_0x49_eor_immediate_xor() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0x80, 0x49, 0xff, 0x00]);
+    assert_eq!(cpu.register_a, 0b0111_1111);
+   }
+
+   #[test]
+   fn test_0x09_ora_immediate_logical_or_inclusive() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0x80, 0x09, 0x7f, 0x00]);
+    assert_eq!(cpu.register_a, 0b1111_1111);
+   }
+
    #[test]
    fn test_0x4a_lsr_accumulator_left_shift() {
     let mut cpu = CPU::new();
@@ -602,6 +641,14 @@ mod test {
    fn test_0x29_and_immediate_logical_and_bitwise() {
     let mut cpu = CPU::new();
     cpu.load_and_run(vec![0xa9, 0x80, 0x29, 0x01, 0x00]);
+    assert_eq!(cpu.register_a, 0b0000_0000);
+   }
+
+   #[test]
+   fn test_0x2d_and_absolute_logical_and_bitwise() {
+    let mut cpu = CPU::new();
+    cpu.mem_write(0x20, 0x80);
+    cpu.load_and_run(vec![0xa9, 0x80, 0x2d, 0x01, 0x00, 0x00]);
     assert_eq!(cpu.register_a, 0b0000_0000);
    }
  
