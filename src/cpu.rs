@@ -6,6 +6,7 @@ pub struct CPU { // CPU with..
     pub register_a: u8, // Accumulator A
     pub register_x: u8, // Register X
     pub register_y: u8, // Register Y
+    pub stack_pointer: u8, // Stack Pointer
     pub status: u8, // Status flags [NV_BDIZC]
     pub program_counter: u16, // Program Counter
     memory: [u8; 0xFFFF] // ...and 64 Kilobits of total memory space
@@ -67,6 +68,7 @@ impl CPU {
             register_a: 0,
             register_x: 0,
             register_y: 0,
+            stack_pointer: 0xff,
             status: 0,
             program_counter: 0,
             memory: [0; 0xFFFF]
@@ -77,6 +79,8 @@ impl CPU {
         self.register_a = 0;
         self.register_x = 0;
         self.status = 0;
+
+        self.stack_pointer = 0xff;
  
         self.program_counter = self.mem_read_u16(0xFFFC);
     }
@@ -221,6 +225,15 @@ impl CPU {
         self.update_zero_and_negative_flags(self.register_a);
     }
 
+    fn tsx(&mut self) {
+        self.register_x = self.stack_pointer;
+        self.update_zero_and_negative_flags(self.register_x);
+    }
+
+    fn txs(&mut self) {
+        self.stack_pointer = self.register_x;
+    }
+
     fn inx(&mut self) {
         if self.register_x == 0xff { 
             self.register_x = 0;
@@ -263,16 +276,52 @@ impl CPU {
         self.update_zero_and_negative_flags(self.register_a);
     }
 
+    fn cmp(&mut self, mode: &AddressingMode) {
+        let addr = self.get_operand_address(mode);
+        let value = self.mem_read(addr);
+
+        let check = (self.register_a as i8) - (value as i8);
+
+        if check >= 0 { // conversion to i8 necessary for comparison
+            self.sec();
+        }
+        self.update_zero_and_negative_flags(check as u8);
+    }
+
+    fn cpx(&mut self, mode: &AddressingMode) {
+        let addr = self.get_operand_address(mode);
+        let value = self.mem_read(addr);
+
+        let check = (self.register_x as i8) - (value as i8);
+
+        if check >= 0 { // conversion to i8 necessary for comparison
+            self.sec();
+        }
+        self.update_zero_and_negative_flags(check as u8);
+    }
+
+    fn cpy(&mut self, mode: &AddressingMode) {
+        let addr = self.get_operand_address(mode);
+        let value = self.mem_read(addr);
+
+        let check = (self.register_y as i8) - (value as i8);
+
+        if check >= 0 { // conversion to i8 necessary for comparison
+            self.sec();
+        }
+        self.update_zero_and_negative_flags(check as u8);
+    }
+
     fn asl(&mut self, mode: &AddressingMode) {
 
         if mode == &AddressingMode::NoneAddressing {
             let value = self.register_a;
             if value & 0b1000_0000 != 0 { // if 7th (last) bit of register is set, checked w/ bitwise AND
-                self.status = self.status | 0b0000_0001; 
-                // C (carry flag) is set to 1 with bitwise OR
+                self.sec(); 
+                // C (carry flag) is set to 1 with bitwise OR, see below
             } else {
-                self.status = self.status & 0b1111_1110;
-                // C (carry flag) is set to 0  with bitwise AND
+                self.clc();
+                // C (carry flag) is set to 0  with bitwise AND, see below
             }
             self.register_a = value << 1 ;
             self.update_zero_and_negative_flags(self.register_a);
@@ -281,11 +330,11 @@ impl CPU {
             let addr = self.get_operand_address(mode);
             let mut value = self.mem_read(addr);
             if value & 0b1000_0000 != 0 { // if 7th (last) bit of register is set, checked w/ bitwise AND
-                self.status = self.status | 0b0000_0001; 
-                // C (carry flag) is set to 1 with bitwise OR
+                self.sec(); 
+                // C (carry flag) is set to 1 with bitwise OR, see below
             } else {
-                self.status = self.status & 0b1111_1110;
-                // C (carry flag) is set to 0  with bitwise AND
+                self.clc();
+                // C (carry flag) is set to 0  with bitwise AND, see below
             }
             value = value << 1;
             self.mem_write(addr, value);
@@ -366,6 +415,18 @@ impl CPU {
                 0x0a | 0x06 | 0x16 | 0x0e | 0x1e => {
                     self.asl(&opcode.mode);
                 }
+
+                0xc9 | 0xc5 | 0xd5 | 0xcd | 0xdd | 0xd9 | 0xc1 | 0xd1 => {
+                    self.cmp(&opcode.mode);
+                }
+
+                0xe0 | 0xe4 | 0xec => {
+                    self.cpx(&opcode.mode);
+                }
+
+                0xc0 | 0xc4 | 0xcc => {
+                    self.cpy(&opcode.mode);
+                }
                 
                 0xaa => self.tax(),
 
@@ -374,6 +435,10 @@ impl CPU {
                 0x8a => self.txa(),
 
                 0x98 => self.tya(),
+
+                0xba => self.tsx(),
+
+                0x9a => self.txs(),
 
                 0xe8 => self.inx(),
 
@@ -391,7 +456,10 @@ impl CPU {
 
                 //0x90 => self.bcc(),
 
-                0x00 => return,
+                0xea => {} , // NOP
+
+                0x00 => return, // BRK
+
                 _ => todo!(),
             }
 
@@ -418,6 +486,40 @@ mod test {
    //fn test_0x90_bcc_branch_carry_clear() {
     
    //}
+
+   #[test]
+   fn test_0xeo_cpx_comparison_x_immediate() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa2, 0x80, 0xe0, 0x80, 0x00]);
+    assert!(cpu.status & 0b0000_0001 == 0b0000_0001); // C is set
+    assert!(cpu.status & 0b0000_0010 == 0b0000_0010); // Z is set
+    assert!(cpu.status & 0b1000_0000 == 0b0000_0000); // N is unset
+   }
+
+   #[test]
+   fn test_0xc9_cmp_comparison_immediate() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0x80, 0xc9, 0x80, 0x00]);
+    assert!(cpu.status & 0b0000_0001 == 0b0000_0001); // C is set
+    assert!(cpu.status & 0b0000_0010 == 0b0000_0010); // Z is set
+    assert!(cpu.status & 0b1000_0000 == 0b0000_0000); // N is unset
+   }
+
+   #[test]
+   fn test_0xc9_cmp_comparison_from_memory() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0x80, 0x85, 0x20, 0xc5, 0x20, 0x00]);
+    assert!(cpu.status & 0b0000_0001 == 0b0000_0001); // C is set
+    assert!(cpu.status & 0b0000_0010 == 0b0000_0010); // Z is set
+    assert!(cpu.status & 0b1000_0000 == 0b0000_0000); // N is unset
+   }
+
+   #[test]
+   fn test_tsx_transfer_stack_pointer_value_to_x() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xba,  0x00]);
+    assert_eq!(cpu.register_x , 0xff);
+   }
 
    #[test]
    fn test_non_overflow_sets_and_clears() {
