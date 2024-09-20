@@ -234,6 +234,36 @@ impl CPU {
         self.stack_pointer = self.register_x;
     }
 
+    fn inc(&mut self, mode: &AddressingMode) {
+        let addr = self.get_operand_address(mode);
+        let mut value = self.mem_read(addr);
+
+        if value == 0xff { 
+            value = 0;
+        } else {
+            value += 1;
+        }
+        self.mem_write(addr, value);
+
+        self.update_zero_and_negative_flags(value);
+        // note: Carry is NOT USED! Addition here is in modulo 0xff, loops back to 0.
+    }
+
+    fn dec(&mut self, mode: &AddressingMode) {
+        let addr = self.get_operand_address(mode);
+        let mut value = self.mem_read(addr);
+
+        if value == 0 { 
+            value = 0xff;
+        } else {
+            value -= 1;
+        }
+        self.mem_write(addr, value);
+
+        self.update_zero_and_negative_flags(value);
+        // note: Carry is NOT USED! Subtraction here is in modulo 0xff, loops back to 0xff.
+    }
+
     fn inx(&mut self) {
         if self.register_x == 0xff { 
             self.register_x = 0;
@@ -242,6 +272,26 @@ impl CPU {
         }
         self.update_zero_and_negative_flags(self.register_x);
         // note: Carry is NOT USED! Addition here is in modulo 0xff, loops back to 0.
+    }
+
+    fn dex(&mut self) {
+        if self.register_x == 0 { 
+            self.register_x = 0xff;
+        } else {
+            self.register_x -= 1;
+        }
+        self.update_zero_and_negative_flags(self.register_x);
+        // note: Carry is NOT USED! Subtraction here is in modulo 0xff, loops back to 0xff.
+    }
+
+    fn dey(&mut self) {
+        if self.register_y == 0 { 
+            self.register_y = 0xff;
+        } else {
+            self.register_y -= 1;
+        }
+        self.update_zero_and_negative_flags(self.register_y);
+        // note: Carry is NOT USED! Subtraction here is in modulo 0xff, loops back to 0xff.
     }
 
     fn iny(&mut self) {
@@ -358,6 +408,7 @@ impl CPU {
             self.update_zero_and_negative_flags(value);
         }
     }
+    
 
     fn lsr(&mut self, mode: &AddressingMode) {
 
@@ -499,9 +550,21 @@ impl CPU {
 
                 0x9a => self.txs(),
 
+                0xe6 | 0xf6 | 0xee | 0xfe => {
+                    self.inc(&opcode.mode);
+                }
+
+                0xc6 | 0xd6 | 0xce | 0xde => {
+                    self.dec(&opcode.mode);
+                }
+
                 0xe8 => self.inx(),
 
+                0xca => self.dex(),
+
                 0xc8 => self.iny(),
+                
+                0x88 => self.dey(),
 
                 0x38 => self.sec(),
 
@@ -545,6 +608,15 @@ mod test {
    //fn test_0x90_bcc_branch_carry_clear() {
     
    //}
+   #[test]
+   fn test_e6_c6_inc_dec_zero_page() {
+    let mut cpu = CPU::new();
+    cpu.mem_write(0x20, 0x80);
+    cpu.mem_write(0x21, 0x80);
+    cpu.load_and_run(vec![0xe6, 0x20, 0xc6, 0x21, 0x00]);
+    assert_eq!(cpu.mem_read(0x20), 0x81);
+    assert_eq!(cpu.mem_read(0x21), 0x7f);
+   }
 
    #[test]
    fn test_0x49_eor_immediate_xor() {
