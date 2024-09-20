@@ -550,6 +550,24 @@ impl CPU {
         self.status = self.status & 0b1011_1111;
     }
 
+    fn bit(&mut self, mode: &AddressingMode) {
+        let addr = self.get_operand_address(mode);
+        let value = self.mem_read(addr);
+
+        if (self.register_a & value) == 0 { // if register = 0
+            self.status = self.status | 0b0000_0010; 
+            // Z (zero flag) set to 1 with bitwise OR
+        } else {
+            self.status = self.status & 0b1111_1101;
+            //otherwise, bitwise AND keeps everything else the same 
+            //and sets Z to 0.
+        }
+
+        self.status = self.status | (value & 0b1100_0000); // bracketed potion gets bit 7 and
+        // 6 out of the value , which are then copied into N and V with bitwise OR.
+
+    }
+
     //fn bcc(&mut self) {
     //    if self.status & 0b0000_0001 == 0b0000_0001 {
     //        self.program_counter = self.mem_read_u16(self.program_counter + 1);
@@ -655,6 +673,10 @@ impl CPU {
                     self.dec(&opcode.mode);
                 }
 
+                0x24 | 0x2c => {
+                    self.bit(&opcode.mode);
+                }
+
                 0xe8 => self.inx(),
 
                 0xca => self.dex(),
@@ -705,6 +727,16 @@ mod test {
    //fn test_0x90_bcc_branch_carry_clear() {
     
    //}
+
+   #[test]
+   fn test_0x24_bit_test() {
+    let mut cpu = CPU::new();
+    cpu.mem_write(0x20, 0xc0);
+    cpu.load_and_run(vec![0xa9, 0x3f, 0x24, 0x20, 0x00]);
+    assert!(cpu.status & 0b0000_0010 == 0b0000_0010); // Z
+    assert!(cpu.status & 0b1000_0000 == 0b1000_0000); // N
+    assert!(cpu.status & 0b0100_0000 == 0b0100_0000); // V
+   }
 
    #[test]
    fn test_0x6a_ror_accumulator_rotate_right() {
