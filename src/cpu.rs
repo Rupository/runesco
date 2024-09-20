@@ -568,11 +568,149 @@ impl CPU {
 
     }
 
-    //fn bcc(&mut self) {
-    //    if self.status & 0b0000_0001 == 0b0000_0001 {
-    //        self.program_counter = self.mem_read_u16(self.program_counter + 1);
-    //    }
-    //}
+    fn bne(&mut self) {
+        if self.status & 0b0000_0010 == 0b0000_0000 {
+            let value = self.mem_read(self.program_counter);
+
+            let shift = value as i8;
+
+            if shift >= 0 {
+                self.program_counter = self.program_counter + 1 + (shift as u16);
+                // increment the counter to put it at appropriate postion, and then shift ahead.
+            } else {
+                self.program_counter = self.program_counter - (0xffff - shift as u16);
+                // shift back, and the way this is implemented by the datatypes (because of 2's complement),
+                // counter gets automatically shifted correctly.
+            }
+        }
+    }
+
+    fn beq(&mut self) {
+        if self.status & 0b0000_0010 == 0b0000_0010 {
+            let value = self.mem_read(self.program_counter);
+
+            let shift = value as i8;
+
+            if shift >= 0 {
+                self.program_counter = self.program_counter + 1 + (shift as u16);
+                // increment the counter to put it at appropriate postion, and then shift ahead.
+            } else {
+                self.program_counter = self.program_counter - (0xffff - shift as u16);
+                // shift back, and the way this is implemented by the datatypes (because of 2's complement),
+                // counter gets automatically shifted correctly.
+            }
+        }
+    }
+
+    fn bcc(&mut self) {
+        if self.status & 0b0000_0001 == 0b0000_0000 {
+            let value = self.mem_read(self.program_counter);
+
+            let shift = value as i8;
+
+            if shift >= 0 {
+                self.program_counter = self.program_counter + 1 + (shift as u16);
+                // increment the counter to put it at appropriate postion, and then shift ahead.
+            } else {
+                self.program_counter = self.program_counter - (0xffff - shift as u16);
+                // shift back, and the way this is implemented by the datatypes (because of 2's complement),
+                // counter gets automatically shifted correctly.
+            }
+        }
+    }
+
+    fn bcs(&mut self) {
+        if self.status & 0b0000_0001 == 0b0000_0001 {
+            let value = self.mem_read(self.program_counter);
+
+            let shift = value as i8;
+
+            if shift >= 0 {
+                self.program_counter = self.program_counter + 1 + (shift as u16);
+                // increment the counter to put it at appropriate postion, and then shift ahead.
+            } else {
+                self.program_counter = self.program_counter - (0xffff - shift as u16);
+                // shift back, and the way this is implemented by the datatypes (because of 2's complement),
+                // counter gets automatically shifted correctly.
+            }
+        }
+    }
+
+    fn bmi(&mut self) {
+        if self.status & 0b1000_0000 == 0b1000_0000 {
+            let value = self.mem_read(self.program_counter);
+
+            let shift = value as i8;
+
+            if shift >= 0 {
+                self.program_counter = self.program_counter + 1 + (shift as u16);
+                // increment the counter to put it at appropriate postion, and then shift ahead.
+            } else {
+                self.program_counter = self.program_counter - (0xffff - shift as u16);
+                // shift back, and the way this is implemented by the datatypes (because of 2's complement),
+                // counter gets automatically shifted correctly.
+            }
+        }
+    }
+
+    fn bpl(&mut self) {
+        if self.status & 0b1000_0000 == 0b0000_0000 {
+            let value = self.mem_read(self.program_counter);
+
+            let shift = value as i8;
+
+            if shift >= 0 {
+                self.program_counter = self.program_counter + 1 + (shift as u16);
+                // increment the counter to put it at appropriate postion, and then shift ahead.
+            } else {
+                self.program_counter = self.program_counter - (0xffff - shift as u16);
+                // shift back, and the way this is implemented by the datatypes (because of 2's complement),
+                // counter gets automatically shifted correctly.
+            }
+        }
+    }
+
+    fn bvc(&mut self) {
+        if self.status & 0b0100_0000 == 0b0000_0000 {
+            let value = self.mem_read(self.program_counter);
+
+            let shift = value as i8;
+
+            if shift >= 0 {
+                self.program_counter = self.program_counter + 1 + (shift as u16);
+                // increment the counter to put it at appropriate postion, and then shift ahead.
+            } else {
+                self.program_counter = self.program_counter - (0xffff - shift as u16);
+                // shift back, and the way this is implemented by the datatypes (because of 2's complement),
+                // counter gets automatically shifted correctly.
+            }
+        }
+    }
+
+    fn bvs(&mut self) {
+        if self.status & 0b0100_0000 == 0b0100_0000 {
+            let value = self.mem_read(self.program_counter);
+
+            let shift = value as i8;
+
+            if shift >= 0 {
+                self.program_counter = self.program_counter + 1 + (shift as u16);
+                // increment the counter to put it at appropriate postion, and then shift ahead.
+            } else {
+                self.program_counter = self.program_counter - (0xffff - shift as u16);
+                // shift back, and the way this is implemented by the datatypes (because of 2's complement),
+                // counter gets automatically shifted correctly.
+            }
+        }
+    }
+
+    /*fn jmp(&mut self, mode: &AddressingMode) {
+        let addr = self.get_operand_address(mode);
+        let value = self.mem_read(addr);
+
+        self.program_counter = value;
+        return;
+    }*/
     
     pub fn run(&mut self) {
         let ref opcodes: HashMap<u8, &'static opcodes::OpCode> = *opcodes::OPCODES_MAP;
@@ -652,6 +790,22 @@ impl CPU {
                 0xc0 | 0xc4 | 0xcc => {
                     self.cpy(&opcode.mode);
                 }
+
+                0xd0 => self.bne(),
+
+                0x90 => self.bcc(),
+
+                0xb0 => self.bcs(),
+
+                0xf0 => self.beq(),
+
+                0x30 => self.bmi(),
+
+                0x10 => self.bpl(),
+
+                0x50 => self.bvc(),
+
+                0x70 => self.bvs(),
                 
                 0xaa => self.tax(),
 
@@ -723,10 +877,22 @@ impl CPU {
 mod test {
    use super::*;
 
-   //#[test]
-   //fn test_0x90_bcc_branch_carry_clear() {
-    
-   //}
+   #[test]
+   fn test_0xd0_bne_branch_not_equal_positive_shift() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0x01, 0xc9, 0x02, 0xd0, 0x02, 0x85, 0x22, 0x00]);
+    assert_eq!(cpu.mem_read(0x22), 0);
+    assert_eq!(cpu.program_counter, 0x8009);
+   }
+
+   #[test]
+   fn test_0xd0_bne_branch_not_equal_negative_shift() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa2, 0x08, 0xca, 0x8e, 0x00, 0x02, 0xe0, 0x03, 0xd0, 0xf8, 0x8e, 0x01, 0x02, 0x00]);
+    assert_eq!(cpu.register_x, 0x03);
+    assert_eq!(cpu.mem_read(0x0201), 0x03);
+    assert_eq!(cpu.program_counter, 0x800e);
+   }
 
    #[test]
    fn test_0x24_bit_test() {

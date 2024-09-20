@@ -94,24 +94,24 @@ lazy_static! {
         OpCode::new(0x0e, "ASL", 3, 6, AddressingMode::Absolute),
         OpCode::new(0x15, "ASL", 3, 7, AddressingMode::Absolute_X),
 
-        OpCode::new(0x90, "BCC", 2, 2/*+1 on success, +2 on new page*/, AddressingMode::NoneAddressing),
+        OpCode::new(0x90, "BCC", 2, 2/*+1 on success, +2 on new page*/, AddressingMode::NoneAddressing), //
         
-        OpCode::new(0xb0, "BCS", 2, 2/*+1 on success, +2 on new page*/, AddressingMode::NoneAddressing),
+        OpCode::new(0xb0, "BCS", 2, 2/*+1 on success, +2 on new page*/, AddressingMode::NoneAddressing), //
         
-        OpCode::new(0xf0, "BEQ", 2, 2/*+1 on success, +2 on new page*/, AddressingMode::NoneAddressing),
+        OpCode::new(0xf0, "BEQ", 2, 2/*+1 on success, +2 on new page*/, AddressingMode::NoneAddressing), //
 
         OpCode::new(0x24, "BIT", 2, 3/*+1 on success, +2 on new page*/, AddressingMode::ZeroPage), //
         OpCode::new(0x2c, "BIT", 2, 3/*+1 on success, +2 on new page*/, AddressingMode::Absolute),
 
-        OpCode::new(0x30, "BMI", 2, 2/*+1 on success, +2 on new page*/, AddressingMode::NoneAddressing),
+        OpCode::new(0x30, "BMI", 2, 2/*+1 on success, +2 on new page*/, AddressingMode::NoneAddressing), //
 
-        OpCode::new(0xd0, "BNE", 2, 2/*+1 on success, +2 on new page*/, AddressingMode::NoneAddressing),
+        OpCode::new(0xd0, "BNE", 2, 2/*+1 on success, +2 on new page*/, AddressingMode::NoneAddressing), //
 
-        OpCode::new(0x10, "BPL", 2, 2/*+1 on success, +2 on new page*/, AddressingMode::NoneAddressing),
+        OpCode::new(0x10, "BPL", 2, 2/*+1 on success, +2 on new page*/, AddressingMode::NoneAddressing), //
 
-        OpCode::new(0x50, "BVC", 2, 2/*+1 on success, +2 on new page*/, AddressingMode::NoneAddressing),
+        OpCode::new(0x50, "BVC", 2, 2/*+1 on success, +2 on new page*/, AddressingMode::NoneAddressing), //
 
-        OpCode::new(0x70, "BVS", 2, 2/*+1 on success, +2 on new page*/, AddressingMode::NoneAddressing),
+        OpCode::new(0x70, "BVS", 2, 2/*+1 on success, +2 on new page*/, AddressingMode::NoneAddressing), //
 
         OpCode::new(0x18, "CLC", 1, 2, AddressingMode::NoneAddressing), //
 
