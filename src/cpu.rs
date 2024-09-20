@@ -408,6 +408,44 @@ impl CPU {
             self.update_zero_and_negative_flags(value);
         }
     }
+
+    fn rol(&mut self, mode: &AddressingMode) {
+
+        let original_carry_flag = self.status & 0b0000_0001;
+
+        if mode == &AddressingMode::NoneAddressing {
+            let value = self.register_a;
+            if value & 0b1000_0000 != 0 { // if 7th (last) bit of register is set, checked w/ bitwise AND
+                self.sec(); 
+                // C (carry flag) is set to 1 with bitwise OR, see below
+            } else {
+                self.clc();
+                // C (carry flag) is set to 0  with bitwise AND, see below
+            }
+            self.register_a = value << 1;
+            self.register_a = self.register_a | original_carry_flag; // 0 bit set to og carry flag
+            // with bitwise OR
+
+            self.update_zero_and_negative_flags(self.register_a);
+
+        } else {
+            let addr = self.get_operand_address(mode);
+            let mut value = self.mem_read(addr);
+            if value & 0b1000_0000 != 0 { // if 7th (last) bit of register is set, checked w/ bitwise AND
+                self.sec(); 
+                // C (carry flag) is set to 1 with bitwise OR, see below
+            } else {
+                self.clc();
+                // C (carry flag) is set to 0  with bitwise AND, see below
+            }
+            value = value << 1;
+            value = value | original_carry_flag; // 0 bit set to og carry flag with bitwise OR
+
+            self.mem_write(addr, value);
+
+            self.update_zero_and_negative_flags(value);
+        }
+    }
     
 
     fn lsr(&mut self, mode: &AddressingMode) {
@@ -435,6 +473,57 @@ impl CPU {
                 // C (carry flag) is set to 0  with bitwise AND, see below
             }
             value = value >> 1;
+            self.mem_write(addr, value);
+
+            self.update_zero_and_negative_flags(value);
+        }
+    }
+
+    fn ror(&mut self, mode: &AddressingMode) {
+
+        let original_carry_flag = self.status & 0b0000_0001;
+
+        if mode == &AddressingMode::NoneAddressing {
+
+            let value = self.register_a;
+            if value & 0b0000_0001 != 0 { // if bit 0 of register is set, checked w/ bitwise AND
+                self.sec(); 
+                // C (carry flag) is set to 1 with bitwise OR, see below
+            } else {
+                self.clc();
+                // C (carry flag) is set to 0  with bitwise AND, see below
+            }
+            self.register_a = value >> 1 ;
+
+            if original_carry_flag == 0b0000_0001 {
+                self.register_a = self.register_a | 0b1000_0000; // last bit set to og carry flag 
+                // with bitwise OR
+            } else {
+                self.register_a = self.register_a | 0b0000_0000
+            }; 
+            
+            self.update_zero_and_negative_flags(self.register_a);
+
+        } else {
+
+            let addr = self.get_operand_address(mode);
+            let mut value = self.mem_read(addr);
+            if value & 0b1000_0000 != 0 { // if 7th (last) bit of register is set, checked w/ bitwise AND
+                self.sec(); 
+                // C (carry flag) is set to 1 with bitwise OR, see below
+            } else {
+                self.clc();
+                // C (carry flag) is set to 0  with bitwise AND, see below
+            }
+            value = value >> 1;
+            
+            if original_carry_flag == 0b0000_0001 {
+                value = value | 0b1000_0000; // last bit set to og carry flag 
+                // with bitwise OR
+            } else {
+                value = value | 0b0000_0000
+            }; 
+
             self.mem_write(addr, value);
 
             self.update_zero_and_negative_flags(value);
@@ -522,8 +611,16 @@ impl CPU {
                     self.asl(&opcode.mode);
                 }
 
+                0x2a | 0x26 | 0x36 | 0x2e | 0x3e => {
+                    self.rol(&opcode.mode);
+                }
+
                 0x4a | 0x46 | 0x56 | 0x4e | 0x5e => {
                     self.lsr(&opcode.mode);
+                }
+
+                0x6a | 0x66 | 0x76 | 0x6e | 0x7e => {
+                    self.ror(&opcode.mode);
                 }
 
                 0xc9 | 0xc5 | 0xd5 | 0xcd | 0xdd | 0xd9 | 0xc1 | 0xd1 => {
@@ -563,7 +660,7 @@ impl CPU {
                 0xca => self.dex(),
 
                 0xc8 => self.iny(),
-                
+
                 0x88 => self.dey(),
 
                 0x38 => self.sec(),
@@ -608,6 +705,41 @@ mod test {
    //fn test_0x90_bcc_branch_carry_clear() {
     
    //}
+
+   #[test]
+   fn test_0x6a_ror_accumulator_rotate_right() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0x38, 0xa9, 0x02, 0x6a, 0x00]);
+    assert_eq!(cpu.register_a, 0x81);
+    assert!(cpu.status & 0b0000_0001 == 0b0000_0000);
+   }
+
+   #[test]
+   fn test_0x66_ror_from_memory_rotate_right() {
+    let mut cpu = CPU::new();
+    cpu.mem_write(0x20, 0x02);
+    cpu.load_and_run(vec![0x38, 0x66, 0x20, 0x00]);
+    assert_eq!(cpu.mem_read(0x20), 0x81);
+    assert!(cpu.status & 0b0000_0001 == 0b0000_0000);
+   }
+
+   #[test]
+   fn test_0x2a_rol_accumulator_rotate_left() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0x38, 0xa9, 0x7f, 0x2a, 0x00]);
+    assert_eq!(cpu.register_a, 0xff);
+    assert!(cpu.status & 0b0000_0001 == 0b0000_0000);
+   }
+
+   #[test]
+   fn test_0x26_rol_from_memory_rotate_left() {
+    let mut cpu = CPU::new();
+    cpu.mem_write(0x20, 0x7f);
+    cpu.load_and_run(vec![0x38, 0x26, 0x20, 0x00]);
+    assert_eq!(cpu.mem_read(0x20), 0xff);
+    assert!(cpu.status & 0b0000_0001 == 0b0000_0000);
+   }
+
    #[test]
    fn test_e6_c6_inc_dec_zero_page() {
     let mut cpu = CPU::new();
