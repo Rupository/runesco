@@ -704,13 +704,10 @@ impl CPU {
         }
     }
 
-    /*fn jmp(&mut self, mode: &AddressingMode) {
+    fn jmp(&mut self, mode: &AddressingMode) {
         let addr = self.get_operand_address(mode);
-        let value = self.mem_read(addr);
-
-        self.program_counter = value;
-        return;
-    }*/
+        self.program_counter = addr;
+    }
     
     pub fn run(&mut self) {
         let ref opcodes: HashMap<u8, &'static opcodes::OpCode> = *opcodes::OPCODES_MAP;
@@ -831,6 +828,10 @@ impl CPU {
                     self.bit(&opcode.mode);
                 }
 
+                0x4c | 0x6c => {
+                    self.jmp(&opcode.mode);
+                }
+
                 0xe8 => self.inx(),
 
                 0xca => self.dex(),
@@ -876,6 +877,16 @@ impl CPU {
 #[cfg(test)]
 mod test {
    use super::*;
+
+   #[test]
+   fn test_0x4c_jmp_jump_absolute() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0x03, 0x4c, 0x07, 0x80, 0xa9, 0x30, 0x8d, 0x00, 0x02]);
+    assert_eq!(cpu.program_counter, 0x800b); // stops at 11 instead of 10 because there is no break,
+    // and an unencoded break occurs when it reads from memory outside of the program vector,
+    // which are all 0x0000 = 0x00, leading us to a break.
+    assert_eq!(cpu.mem_read_u16(0x0200), 0x03); 
+   }
 
    #[test]
    fn test_0xd0_bne_branch_not_equal_positive_shift() {
