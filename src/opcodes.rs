@@ -159,7 +159,7 @@ lazy_static! {
         OpCode::new(0xee, "INC", 3, 6, AddressingMode::Absolute),
         OpCode::new(0xfe, "INC", 3, 7, AddressingMode::Absolute_X),
 
-        OpCode::new(0x4c, "JMP", 3, 3, AddressingMode::Absolute),
+        OpCode::new(0x4c, "JMP", 3, 3, AddressingMode::Absolute), //
         OpCode::new(0x6c, "JMP", 3, 5, AddressingMode::NoneAddressing),
 
         OpCode::new(0x20, "JSR", 3, 6, AddressingMode::Absolute),

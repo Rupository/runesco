@@ -708,7 +708,47 @@ impl CPU {
         let addr = self.get_operand_address(mode);
         self.program_counter = addr;
     }
+
+    fn pha(&mut self) {
+        let copy = self.register_a;
+        let addr = 0x0100 + ((0xff - self.stack_pointer) as u16);
+
+        self.mem_write(addr, copy);
+        self.stack_pointer -= 1; // wrapping is not used here as rust will panic on overflow,
+        // implicitly encoding it
+    }
+
+    fn php(&mut self) {
+        self.status = self.status | 0b0001_0000; // set B flag
+        
+        let copy = self.status;
+        let addr = 0x0100 + ((0xff - self.stack_pointer) as u16);
+
+        self.mem_write(addr, copy);
+        self.stack_pointer -= 1;
+    }
     
+    fn pla(&mut self) {
+        self.stack_pointer += 1; // wrapping is not used here as rust will panic on underflow,
+        // implicitly encoding it.
+
+        // Added to SP before rest of the pull ensures correct indexing for memory address.
+        let addr = 0x0100 + ((0xff - self.stack_pointer) as u16);
+        self.register_a = self.mem_read(addr);
+
+        self.mem_write(addr, 0x00);
+        
+        self.update_zero_and_negative_flags(self.register_a);
+    }
+
+    fn plp(&mut self) {
+        self.stack_pointer += 1;
+        let addr = 0x0100 + ((0xff - self.stack_pointer) as u16);
+        self.status = self.mem_read(addr);
+
+        self.mem_write(addr, 0x00);
+    }
+
     pub fn run(&mut self) {
         let ref opcodes: HashMap<u8, &'static opcodes::OpCode> = *opcodes::OPCODES_MAP;
         // create a reference opdcodes in the cpu of the Hashmap type from u8 to OpCode data, from OPCODES_MAP in 
@@ -832,6 +872,14 @@ impl CPU {
                     self.jmp(&opcode.mode);
                 }
 
+                0x48 => self.pha(),
+
+                0x08 => self.php(),
+
+                0x68 => self.pla(),
+
+                0x28 => self.plp(),
+
                 0xe8 => self.inx(),
 
                 0xca => self.dex(),
@@ -854,7 +902,10 @@ impl CPU {
 
                 0xea => {} , // NOP
 
-                0x00 => return, // BRK
+                0x00 => { // BRK
+                    self.status = self.status | 0b0001_0000; // set B flag
+                    return; 
+                }
 
                 _ => todo!(),
             }
@@ -877,6 +928,47 @@ impl CPU {
 #[cfg(test)]
 mod test {
    use super::*;
+
+   #[test]
+   #[should_panic]
+   fn panic_overflow_stack_pha() {
+    let mut cpu = CPU::new();
+    cpu.stack_pointer = 0x00;
+    cpu.load(vec![0xa9, 0x80, 0x48, 0x00]); // Didn't use normal load_and_run
+    // as that would reset the stack pointer.
+    cpu.program_counter = cpu.mem_read_u16(0xFFFC);
+    cpu.run();
+   }
+
+   #[test]
+   #[should_panic]
+   fn panic_underflow_stack_pla() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0x80, 0x68, 0x00]);
+   }
+
+   #[test]
+   fn test_0x48_0x08_0x68_0x28_stack_ops_no_overflow_no_underflow() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0x7f, 0x48, 0x38, 0x08, 0x18, 0xa9, 0x20, 0x28, 0x68, 0x00]);
+    assert_eq!(cpu.stack_pointer, 0xff);
+    assert_eq!(cpu.register_a, 0x7f);
+    assert_eq!(cpu.mem_read(0x0100), 0x00);
+    assert!(cpu.status & 0b0000_0001 == 0b0000_0001);
+    assert_eq!(cpu.mem_read(0x0101), 0x00);
+   }
+
+  #[test]
+   fn test_0x48_0x08_stack_pushes_no_overflow_no_underflow() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0x7f, 0x48, 0x38, 0x08, 0x18, 0xa9, 0x20, 0x00]);
+    assert_eq!(cpu.stack_pointer, 0xfd);
+    assert_ne!(cpu.register_a, 0x7f);
+    assert_eq!(cpu.register_a, 0x20);
+    assert_eq!(cpu.mem_read(0x0100), 0x7f);
+    assert!(cpu.status & 0b0000_0001 == 0b0000_0000);
+    assert!(cpu.mem_read(0x0101) & 0b0000_0001 == 0b0000_0001);
+   }
 
    #[test]
    fn test_0x4c_jmp_jump_absolute() {
