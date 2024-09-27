@@ -749,6 +749,34 @@ impl CPU {
         self.mem_write(addr, 0x00);
     }
 
+    fn jsr(&mut self, mode: &AddressingMode) {
+        let stack_addr = 0x0100 + ((0xff - self.stack_pointer) as u16);
+        self.mem_write_u16(stack_addr, self.program_counter - 1);
+        self.stack_pointer -= 2; // Program counter takes two units of memory space as it is u16
+
+        let addr = self.get_operand_address(mode);
+        self.program_counter = addr;
+    }
+
+    fn rts(&mut self) { 
+        self.stack_pointer += 2;
+        let addr = 0x0100 + ((0xff - self.stack_pointer) as u16);
+        self.program_counter = self.mem_read_u16(addr) + 3;
+        self.mem_write_u16(addr, 0x00);
+    }
+
+    fn rti(&mut self) {
+        self.stack_pointer += 1;
+        let mut addr = 0x0100 + ((0xff - self.stack_pointer) as u16);
+        self.status = self.mem_read(addr);
+        self.mem_write(addr, 0x00);
+
+        self.stack_pointer += 2;
+        addr = addr - 1;
+        self.program_counter = self.mem_read_u16(addr);
+        self.mem_write_u16(addr, 0x00);
+    }
+
     pub fn run(&mut self) {
         let ref opcodes: HashMap<u8, &'static opcodes::OpCode> = *opcodes::OPCODES_MAP;
         // create a reference opdcodes in the cpu of the Hashmap type from u8 to OpCode data, from OPCODES_MAP in 
@@ -827,6 +855,12 @@ impl CPU {
                 0xc0 | 0xc4 | 0xcc => {
                     self.cpy(&opcode.mode);
                 }
+
+                0x40 => self.rti(),
+
+                0x20 => self.jsr(&opcode.mode),
+
+                0x60 => self.rts(),
 
                 0xd0 => self.bne(),
 
@@ -928,6 +962,23 @@ impl CPU {
 #[cfg(test)]
 mod test {
    use super::*;
+
+   #[test]
+   fn jsr_rts_bne_program_loop() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0x20, 0x09, 0x80, 0x20, 0x0c, 0x80, 0x20, 0x12,
+         0x80, 0xa2, 0x01, 0x60, 0xe8, 0xe0, 0x05, 0xd0, 0xfb, 0x60, 0x00]);
+    assert_eq!(cpu.stack_pointer, 0xfd);
+    assert_eq!(cpu.register_x, 0x05);
+   }
+   
+   #[test] // do with pen and paper
+   fn jsr_rts_basic_test() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0x20, 0x06, 0x80, 0x20, 0x09, 0x80, 0xa2, 0x01, 0x60, 0x00]);
+    assert_eq!(cpu.stack_pointer, 0xfd);
+    assert_eq!(cpu.register_x, 0x01);
+   }
 
    #[test]
    #[should_panic]
