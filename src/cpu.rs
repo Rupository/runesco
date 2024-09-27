@@ -770,11 +770,55 @@ impl CPU {
         let mut addr = 0x0100 + ((0xff - self.stack_pointer) as u16);
         self.status = self.mem_read(addr);
         self.mem_write(addr, 0x00);
+        
+        addr = addr - 1;
 
         self.stack_pointer += 2;
-        addr = addr - 1;
-        self.program_counter = self.mem_read_u16(addr);
+        self.program_counter = self.mem_read_u16(addr)+3;
         self.mem_write_u16(addr, 0x00);
+    }
+
+    fn plus_minus(&mut self, value: u8) {
+        // based on the following resource:
+        // https://www.righto.com/2012/12/the-6502-overflow-flag-explained.html
+
+        let c6 = (self.status & 0b0000_0001) << 7;
+
+        let sum: u16 = self.register_a as u16 + value as u16 + c6 as u16;
+
+        let c7 = (sum >> 8) as u8; // extract carry of 8th bit
+
+        self.status =  self.status | c7; // insert correctly
+
+        let result = sum as u8;
+
+        if (result ^ self.register_a) & (result ^ value) & 0x80 != 0 {
+
+            self.status = self.status | 0b0100_0000; // set overflow
+        } else {
+            self.status = self.status & 0b1011_1111; // unset overflow
+        }
+
+        self.register_a = result;
+
+        self.update_zero_and_negative_flags(self.register_a);
+
+    }
+
+    fn adc(&mut self, mode: &AddressingMode) {
+        let addr = self.get_operand_address(mode);
+        let value = self.mem_read(addr);
+
+        self.plus_minus(value);
+
+    }
+
+    fn sbc(&mut self, mode: &AddressingMode) {
+        let addr = self.get_operand_address(mode);
+        let mut value = self.mem_read(addr);
+
+        value = !value; // 1's complement 
+        self.plus_minus(value); // X - Y ==  X + -Y, and -Y == !Y  in signed complements.
     }
 
     pub fn run(&mut self) {
@@ -818,6 +862,14 @@ impl CPU {
 
                 0x29 | 0x25 | 0x35 | 0x2d | 0x3d | 0x39 | 0x21 | 0x31 => {
                     self.and(&opcode.mode);
+                }
+
+                0xe9 | 0xe5 | 0xf5 | 0xed | 0xfd | 0xf9 | 0xe1 | 0xf1 => {
+                    self.sbc(&opcode.mode);
+                }
+
+                0x69 | 0x65 | 0x75 | 0x6d | 0x7d | 0x79 | 0x61 | 0x71 => {
+                    self.adc(&opcode.mode);
                 }
 
                 0x09 | 0x05 | 0x15 | 0x0d | 0x1d | 0x19 | 0x01 | 0x11 => {
@@ -962,6 +1014,24 @@ impl CPU {
 #[cfg(test)]
 mod test {
    use super::*;
+
+   #[test]
+   fn sbc_0xe9_zero_page_subtract_with_carry() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0x80, 0xe9, 0x01, 0x00]);
+    assert_eq!(cpu.register_a, 0x7e);
+    assert_eq!(cpu.status & 0b0100_0000, 0b0100_0000); // overflow flag set
+    assert_eq!(cpu.status & 0b0000_0001, 0b0000_0001); // carry flag set
+   }
+
+   #[test]
+   fn adc_0x69_zero_page_add_with_carry() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0x80, 0x69, 0x80, 0x00]);
+    assert_eq!(cpu.register_a, 0x00);
+    assert_eq!(cpu.status & 0b0100_0000, 0b0100_0000); // overflow flag set
+    assert_eq!(cpu.status & 0b0000_0001, 0b0000_0001); // carry flag set
+   }
 
    #[test]
    fn jsr_rts_bne_program_loop() {
