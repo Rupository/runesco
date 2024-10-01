@@ -5,5 +5,5 @@ pub mod opcodes;
 extern crate lazy_static;
 
 fn main () {
-    println!("ruNESco: Rust NES Co-op");
+    println!("ruNESco: Rust NES Co-op - CPU Snake Game Test");
 }
