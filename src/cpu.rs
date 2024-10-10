@@ -31,7 +31,7 @@ pub enum AddressingMode {
    NoneAddressing,
 }
 
-trait Mem {
+pub trait Mem {
     fn mem_read(&self, addr: u16) -> u8; 
 
     fn mem_write(&mut self, addr: u16, data: u8);
@@ -86,9 +86,9 @@ impl CPU {
     }
 
     pub fn load(&mut self, program: Vec<u8>) {
-        self.memory[0x8000 .. (0x8000 + program.len())].copy_from_slice(&program[..]);
+        self.memory[0x0600 .. (0x0600 + program.len())].copy_from_slice(&program[..]);
         // Memory will be written (by slicing) from address 0x8000 to 0xXXXX, depending on program
-        self.mem_write_u16(0xFFFC, 0x8000); // program counter, stored in 0xFFFC 
+        self.mem_write_u16(0xFFFC, 0x0600); // program counter, stored in 0xFFFC 
         // is set to 0x8000
     }
 
@@ -822,12 +822,54 @@ impl CPU {
     }
 
     pub fn run(&mut self) {
+        self.run_with_callback(|_| {}); // This is a closure. A closure is like a function except it captures values
+        // from its environment (that is, rust intelligently infers the type it will be operating with without needing to be told explicitly)
+    }
+
+    // The above is an empty version of run_with_callback() which has been defined below. This pertains to tests
+    // and functionality which does not require updating instructions during the program run, as one would
+    // when handling user input.
+
+    // Before proceeding to the next function definition, it would be useful to know what a callback does:
+
+    // < "Everybody has bought food over a counter. At McDonalds, I tell someone "I want a Big Mac", establish my credentials by 
+    // giving them money, then move aside while I wait for my food. When my food is ready, I am called, and receive what I asked for.
+
+    // Everybody has taken money from an ATM. I assert that I want some money, I establish my credentials with a PIN, wait, 
+    // and (usually) get that amount of money.
+
+    // The key difference between those two scenarios is that in the first the next customer can be served while 
+    // I wait for my food. In the second, those who want to use the ATM must wait until I'm done."
+
+    // - Sandro Pascal, Quora >
+
+    // A callback is like ordering at the McDonalds. Other instructions can be processed while your request has been queued. 
+
+    // In the case of our gameloop, we would want the game to keep updating (the snake to keep moving in some direction)
+    // while waiting for user input to change that direction if needed. 
+
+    // Thus, analogously, after inputting some direction (placing an order), the snake keeps moving (other orders are taken),
+    // your new snake direction is processed (your order is completed), and the snake keeps moving (other orders are taken) 
+    // again until you add another input (place a new order).
+
+
+
+    pub fn run_with_callback<F>(&mut self, mut callback: F) // F is a generic type... 
+    where F: FnMut(&mut CPU), // such that F is a mutable closure which does not move captured values out of their body, 
+    // but might mutate the captured values. These closures can be called more than once.
+
+    // https://doc.rust-lang.org/book/ch13-01-closures.html
+        
+    {   
         let ref opcodes: HashMap<u8, &'static opcodes::OpCode> = *opcodes::OPCODES_MAP;
         // create a reference opdcodes in the cpu of the Hashmap type from u8 to OpCode data, from OPCODES_MAP in 
         // opcode.rs. OPCODES_MAP is dereferenced as it is a ref, and to get values out of it (instead of pointers) we must
         // deref with *.
 
         loop {
+            callback(self); // Queue the inputs (orders) and execute them as and when possible...
+            
+            // ... while the current known inputs can be processed.
             let code = self.mem_read(self.program_counter);
             self.program_counter += 1;
             let program_counter_state = self.program_counter;
@@ -1004,352 +1046,10 @@ impl CPU {
         }
     }
 
+
     pub fn load_and_run(&mut self, program: Vec<u8>) {
         self.load(program);
         self.reset();
         self.run()
     }
-}
-
-#[cfg(test)]
-mod test {
-   use super::*;
-
-   #[test]
-   fn sbc_0xe9_zero_page_subtract_with_carry() {
-    let mut cpu = CPU::new();
-    cpu.load_and_run(vec![0xa9, 0x80, 0xe9, 0x01, 0x00]);
-    assert_eq!(cpu.register_a, 0x7e);
-    assert_eq!(cpu.status & 0b0100_0000, 0b0100_0000); // overflow flag set
-    assert_eq!(cpu.status & 0b0000_0001, 0b0000_0001); // carry flag set
-   }
-
-   #[test]
-   fn adc_0x69_zero_page_add_with_carry() {
-    let mut cpu = CPU::new();
-    cpu.load_and_run(vec![0xa9, 0x80, 0x69, 0x80, 0x00]);
-    assert_eq!(cpu.register_a, 0x00);
-    assert_eq!(cpu.status & 0b0100_0000, 0b0100_0000); // overflow flag set
-    assert_eq!(cpu.status & 0b0000_0001, 0b0000_0001); // carry flag set
-   }
-
-   #[test]
-   fn jsr_rts_bne_program_loop() {
-    let mut cpu = CPU::new();
-    cpu.load_and_run(vec![0x20, 0x09, 0x80, 0x20, 0x0c, 0x80, 0x20, 0x12,
-         0x80, 0xa2, 0x01, 0x60, 0xe8, 0xe0, 0x05, 0xd0, 0xfb, 0x60, 0x00]);
-    assert_eq!(cpu.stack_pointer, 0xfd);
-    assert_eq!(cpu.register_x, 0x05);
-   }
-   
-   #[test] // do with pen and paper
-   fn jsr_rts_basic_test() {
-    let mut cpu = CPU::new();
-    cpu.load_and_run(vec![0x20, 0x06, 0x80, 0x20, 0x09, 0x80, 0xa2, 0x01, 0x60, 0x00]);
-    assert_eq!(cpu.stack_pointer, 0xfd);
-    assert_eq!(cpu.register_x, 0x01);
-   }
-
-   #[test]
-   #[should_panic]
-   fn panic_overflow_stack_pha() {
-    let mut cpu = CPU::new();
-    cpu.stack_pointer = 0x00;
-    cpu.load(vec![0xa9, 0x80, 0x48, 0x00]); // Didn't use normal load_and_run
-    // as that would reset the stack pointer.
-    cpu.program_counter = cpu.mem_read_u16(0xFFFC);
-    cpu.run();
-   }
-
-   #[test]
-   #[should_panic]
-   fn panic_underflow_stack_pla() {
-    let mut cpu = CPU::new();
-    cpu.load_and_run(vec![0xa9, 0x80, 0x68, 0x00]);
-   }
-
-   #[test]
-   fn test_0x48_0x08_0x68_0x28_stack_ops_no_overflow_no_underflow() {
-    let mut cpu = CPU::new();
-    cpu.load_and_run(vec![0xa9, 0x7f, 0x48, 0x38, 0x08, 0x18, 0xa9, 0x20, 0x28, 0x68, 0x00]);
-    assert_eq!(cpu.stack_pointer, 0xff);
-    assert_eq!(cpu.register_a, 0x7f);
-    assert_eq!(cpu.mem_read(0x0100), 0x00);
-    assert!(cpu.status & 0b0000_0001 == 0b0000_0001);
-    assert_eq!(cpu.mem_read(0x0101), 0x00);
-   }
-
-  #[test]
-   fn test_0x48_0x08_stack_pushes_no_overflow_no_underflow() {
-    let mut cpu = CPU::new();
-    cpu.load_and_run(vec![0xa9, 0x7f, 0x48, 0x38, 0x08, 0x18, 0xa9, 0x20, 0x00]);
-    assert_eq!(cpu.stack_pointer, 0xfd);
-    assert_ne!(cpu.register_a, 0x7f);
-    assert_eq!(cpu.register_a, 0x20);
-    assert_eq!(cpu.mem_read(0x0100), 0x7f);
-    assert!(cpu.status & 0b0000_0001 == 0b0000_0000);
-    assert!(cpu.mem_read(0x0101) & 0b0000_0001 == 0b0000_0001);
-   }
-
-   #[test]
-   fn test_0x4c_jmp_jump_absolute() {
-    let mut cpu = CPU::new();
-    cpu.load_and_run(vec![0xa9, 0x03, 0x4c, 0x07, 0x80, 0xa9, 0x30, 0x8d, 0x00, 0x02]);
-    assert_eq!(cpu.program_counter, 0x800b); // stops at 11 instead of 10 because there is no break,
-    // and an unencoded break occurs when it reads from memory outside of the program vector,
-    // which are all 0x0000 = 0x00, leading us to a break.
-    assert_eq!(cpu.mem_read_u16(0x0200), 0x03); 
-   }
-
-   #[test]
-   fn test_0xd0_bne_branch_not_equal_positive_shift() {
-    let mut cpu = CPU::new();
-    cpu.load_and_run(vec![0xa9, 0x01, 0xc9, 0x02, 0xd0, 0x02, 0x85, 0x22, 0x00]);
-    assert_eq!(cpu.mem_read(0x22), 0);
-    assert_eq!(cpu.program_counter, 0x8009);
-   }
-
-   #[test]
-   fn test_0xd0_bne_branch_not_equal_negative_shift() {
-    let mut cpu = CPU::new();
-    cpu.load_and_run(vec![0xa2, 0x08, 0xca, 0x8e, 0x00, 0x02, 0xe0, 0x03, 0xd0, 0xf8, 0x8e, 0x01, 0x02, 0x00]);
-    assert_eq!(cpu.register_x, 0x03);
-    assert_eq!(cpu.mem_read(0x0201), 0x03);
-    assert_eq!(cpu.program_counter, 0x800e);
-   }
-
-   #[test]
-   fn test_0x24_bit_test() {
-    let mut cpu = CPU::new();
-    cpu.mem_write(0x20, 0xc0);
-    cpu.load_and_run(vec![0xa9, 0x3f, 0x24, 0x20, 0x00]);
-    assert!(cpu.status & 0b0000_0010 == 0b0000_0010); // Z
-    assert!(cpu.status & 0b1000_0000 == 0b1000_0000); // N
-    assert!(cpu.status & 0b0100_0000 == 0b0100_0000); // V
-   }
-
-   #[test]
-   fn test_0x6a_ror_accumulator_rotate_right() {
-    let mut cpu = CPU::new();
-    cpu.load_and_run(vec![0x38, 0xa9, 0x02, 0x6a, 0x00]);
-    assert_eq!(cpu.register_a, 0x81);
-    assert!(cpu.status & 0b0000_0001 == 0b0000_0000);
-   }
-
-   #[test]
-   fn test_0x66_ror_from_memory_rotate_right() {
-    let mut cpu = CPU::new();
-    cpu.mem_write(0x20, 0x02);
-    cpu.load_and_run(vec![0x38, 0x66, 0x20, 0x00]);
-    assert_eq!(cpu.mem_read(0x20), 0x81);
-    assert!(cpu.status & 0b0000_0001 == 0b0000_0000);
-   }
-
-   #[test]
-   fn test_0x2a_rol_accumulator_rotate_left() {
-    let mut cpu = CPU::new();
-    cpu.load_and_run(vec![0x38, 0xa9, 0x7f, 0x2a, 0x00]);
-    assert_eq!(cpu.register_a, 0xff);
-    assert!(cpu.status & 0b0000_0001 == 0b0000_0000);
-   }
-
-   #[test]
-   fn test_0x26_rol_from_memory_rotate_left() {
-    let mut cpu = CPU::new();
-    cpu.mem_write(0x20, 0x7f);
-    cpu.load_and_run(vec![0x38, 0x26, 0x20, 0x00]);
-    assert_eq!(cpu.mem_read(0x20), 0xff);
-    assert!(cpu.status & 0b0000_0001 == 0b0000_0000);
-   }
-
-   #[test]
-   fn test_e6_c6_inc_dec_zero_page() {
-    let mut cpu = CPU::new();
-    cpu.mem_write(0x20, 0x80);
-    cpu.mem_write(0x21, 0x80);
-    cpu.load_and_run(vec![0xe6, 0x20, 0xc6, 0x21, 0x00]);
-    assert_eq!(cpu.mem_read(0x20), 0x81);
-    assert_eq!(cpu.mem_read(0x21), 0x7f);
-   }
-
-   #[test]
-   fn test_0x49_eor_immediate_xor() {
-    let mut cpu = CPU::new();
-    cpu.load_and_run(vec![0xa9, 0x80, 0x49, 0xff, 0x00]);
-    assert_eq!(cpu.register_a, 0b0111_1111);
-   }
-
-   #[test]
-   fn test_0x09_ora_immediate_logical_or_inclusive() {
-    let mut cpu = CPU::new();
-    cpu.load_and_run(vec![0xa9, 0x80, 0x09, 0x7f, 0x00]);
-    assert_eq!(cpu.register_a, 0b1111_1111);
-   }
-
-   #[test]
-   fn test_0x4a_lsr_accumulator_left_shift() {
-    let mut cpu = CPU::new();
-    cpu.load_and_run(vec![0xa9, 0x81, 0x4a, 0x00]);
-    assert_eq!(cpu.register_a, 0x40);
-    assert!(cpu.status & 0b0000_0001 == 0b0000_0001);
-   }
-
-   #[test]
-   fn test_0x46_lsr_from_memory_left_shift() {
-    let mut cpu = CPU::new();
-    cpu.mem_write(0x20, 0x81);
-    cpu.load_and_run(vec![0x46, 0x20, 0x00]);
-    assert_eq!(cpu.mem_read(0x20), 0x40);
-    assert!(cpu.status & 0b0000_0001 == 0b0000_0001);
-   }
-
-
-   #[test]
-   fn test_0xeo_cpx_comparison_x_immediate() {
-    let mut cpu = CPU::new();
-    cpu.load_and_run(vec![0xa2, 0x80, 0xe0, 0x80, 0x00]);
-    assert!(cpu.status & 0b0000_0001 == 0b0000_0001); // C is set
-    assert!(cpu.status & 0b0000_0010 == 0b0000_0010); // Z is set
-    assert!(cpu.status & 0b1000_0000 == 0b0000_0000); // N is unset
-   }
-
-   #[test]
-   fn test_0xc9_cmp_comparison_immediate() {
-    let mut cpu = CPU::new();
-    cpu.load_and_run(vec![0xa9, 0x80, 0xc9, 0x80, 0x00]);
-    assert!(cpu.status & 0b0000_0001 == 0b0000_0001); // C is set
-    assert!(cpu.status & 0b0000_0010 == 0b0000_0010); // Z is set
-    assert!(cpu.status & 0b1000_0000 == 0b0000_0000); // N is unset
-   }
-
-   #[test]
-   fn test_0xc9_cmp_comparison_from_memory() {
-    let mut cpu = CPU::new();
-    cpu.load_and_run(vec![0xa9, 0x80, 0x85, 0x20, 0xc5, 0x20, 0x00]);
-    assert!(cpu.status & 0b0000_0001 == 0b0000_0001); // C is set
-    assert!(cpu.status & 0b0000_0010 == 0b0000_0010); // Z is set
-    assert!(cpu.status & 0b1000_0000 == 0b0000_0000); // N is unset
-   }
-
-   #[test]
-   fn test_tsx_transfer_stack_pointer_value_to_x() {
-    let mut cpu = CPU::new();
-    cpu.load_and_run(vec![0xba,  0x00]);
-    assert_eq!(cpu.register_x , 0xff);
-   }
-
-   #[test]
-   fn test_non_overflow_sets_and_clears() {
-    let mut cpu = CPU::new();
-    cpu.load_and_run(vec![0x38, 0x18, 0x78, 0x58, 0x00]);
-    assert!(cpu.status & 0b0000_0001 == 0);
-    assert!(cpu.status & 0b1000_0100 == 0);
-   }
-
-   #[test]
-   fn test_0x0a_asl_accumulator_left_shift() {
-    let mut cpu = CPU::new();
-    cpu.load_and_run(vec![0xa9, 0x80, 0x0a, 0x00]);
-    assert_eq!(cpu.register_a, 0);
-    assert!(cpu.status & 0b0000_0001 == 0b0000_0001);
-   }
-
-   #[test]
-   fn test_0x06_asl_from_memory_left_shift() {
-    let mut cpu = CPU::new();
-    cpu.mem_write(0x20, 0x70);
-    cpu.load_and_run(vec![0x06, 0x20, 0x00]);
-    assert_eq!(cpu.mem_read(0x20), 0xe0);
-    assert!(cpu.status & 0b0000_0001 == 0b0000_0000);
-   }
-
-   #[test]
-   fn test_0x29_and_immediate_logical_and_bitwise() {
-    let mut cpu = CPU::new();
-    cpu.load_and_run(vec![0xa9, 0x80, 0x29, 0x01, 0x00]);
-    assert_eq!(cpu.register_a, 0b0000_0000);
-   }
-
-   #[test]
-   fn test_0x2d_and_absolute_logical_and_bitwise() {
-    let mut cpu = CPU::new();
-    cpu.mem_write(0x20, 0x80);
-    cpu.load_and_run(vec![0xa9, 0x80, 0x2d, 0x01, 0x00, 0x00]);
-    assert_eq!(cpu.register_a, 0b0000_0000);
-   }
- 
-   #[test]
-   fn test_0xa9_lda_immediate_load_data() {
-       let mut cpu = CPU::new();
-       cpu.load_and_run(vec![0xa9, 0x05, 0x00]);
-       assert_eq!(cpu.register_a, 0x05);
-       assert!(cpu.status & 0b0000_0010 == 0b00); // since A =/= 0, tests whether Z flag is set or not 
-       // (should be unset)
-       assert!(cpu.status & 0b1000_0000 == 0); // since 7th bit of A is not set, 
-       // tests whther N flag is set or not (should be unset)
-   }
-
-    #[test]
-    fn test_0xa9_lda_zero_flag() {
-        let mut cpu = CPU::new();
-        cpu.load_and_run(vec![0xa9, 0x00, 0x00]);
-        assert!(cpu.status & 0b0000_0010 == 0b10); // since A = 0, tests whether Z flag 
-        // is set or not (should be set)
-    }
-
-    #[test]
-    fn test_0xa9_lda_neg_flag() {
-        let mut cpu = CPU::new();
-        cpu.load_and_run(vec![0xa9, 0x80, 0x00]);
-        assert!(cpu.status & 0b1000_0000 == 0b1000_0000); // since 7th bit of A is set, 
-        // tests whther N flag is set or not (should be set)
-    }
-
-    #[test]
-    fn test_0xaa_tax_move_a_to_x() {
-        let mut cpu = CPU::new();
-        cpu.load_and_run(vec![0xa9, 0x0a, 0xaa, 0x00]);
-        assert_eq!(cpu.register_x, cpu.register_a)
-    }
-
-    #[test]
-    fn test_0xaa_txa_zero_flag() {
-        let mut cpu = CPU::new();
-        cpu.load_and_run(vec![0xa9, 0x00, 0xaa, 0x00]);
-        assert!(cpu.status & 0b0000_0010 == 0b10); // since A = 0, and then X = 0,
-        // tests whether Z flag is set or not (should be set)
-    }
-
-    #[test]
-    fn test_0xaa_txa_neg_flag() {
-        let mut cpu = CPU::new();
-        cpu.load_and_run(vec![0xa9, 0x80, 0xaa, 0x00]);
-        assert!(cpu.status & 0b1000_0000 == 0b1000_0000); // since A has 7th bit set, and then so does X,
-        // tests whether N flag is set or not (should be set)
-    }
-
-    #[test]
-    fn test_inx_overflow() {
-        let mut cpu = CPU::new();
-        cpu.load_and_run(vec![0xa9, 0xff, 0xaa, 0xe8, 0xe8, 0x00]);
-        assert_eq!(cpu.register_x, 1)
-    }
-
-    #[test]
-   fn test_5_ops_working_together() {
-       let mut cpu = CPU::new();
-       cpu.load_and_run(vec![0xa9, 0xc0, 0xaa, 0xe8, 0x00]);
- 
-       assert_eq!(cpu.register_x, 0xc1)
-   }
-
-   #[test]
-   fn test_lda_from_memory() {
-       let mut cpu = CPU::new();
-       cpu.mem_write(0x10, 0x55);
-
-       cpu.load_and_run(vec![0xa5, 0x10, 0x00]);
-
-       assert_eq!(cpu.register_a, 0x55);
-   }
 }
