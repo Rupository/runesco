@@ -12,7 +12,6 @@ use std::time::Duration;
 
 #[macro_use]
 extern crate lazy_static;
-extern crate bitflags;
 
 fn read_screen_state(cpu: &CPU, frame: &mut [u8; 32 * 3 * 32]) -> bool {
    let mut frame_idx = 0;
@@ -74,7 +73,7 @@ fn main() {
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
     let window = video_subsystem
-        .window("ruNESco CPU: Snake", (32.0 * 10.0) as u32, (32.0 * 10.0) as u32)
+        .window("ruNESco CPU: Snake6502 ", (32.0 * 10.0) as u32, (32.0 * 10.0) as u32)
         .position_centered()
         .build().unwrap();
 

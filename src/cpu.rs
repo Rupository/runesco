@@ -346,36 +346,36 @@ impl CPU {
         let addr = self.get_operand_address(mode);
         let value = self.mem_read(addr);
 
-        let check = (self.register_a as i8) - (value as i8);
+        let check = self.register_a.wrapping_sub(value);
 
-        if check >= 0 { // conversion to i8 necessary for comparison
+        if (check as i8) >= 0 {
             self.sec();
         }
-        self.update_zero_and_negative_flags(check as u8);
+        self.update_zero_and_negative_flags(check);
     }
 
     fn cpx(&mut self, mode: &AddressingMode) {
         let addr = self.get_operand_address(mode);
         let value = self.mem_read(addr);
 
-        let check = (self.register_x as i8) - (value as i8);
+        let check = self.register_x.wrapping_sub(value);
 
-        if check >= 0 { // conversion to i8 necessary for comparison
+        if (check as i8) >= 0 {
             self.sec();
         }
-        self.update_zero_and_negative_flags(check as u8);
+        self.update_zero_and_negative_flags(check);
     }
 
     fn cpy(&mut self, mode: &AddressingMode) {
         let addr = self.get_operand_address(mode);
         let value = self.mem_read(addr);
 
-        let check = (self.register_y as i8) - (value as i8);
+        let check = self.register_y.wrapping_sub(value);
 
-        if check >= 0 { // conversion to i8 necessary for comparison
+        if (check as i8) >= 0 {
             self.sec();
         }
-        self.update_zero_and_negative_flags(check as u8);
+        self.update_zero_and_negative_flags(check);
     }
 
     fn asl(&mut self, mode: &AddressingMode) {
