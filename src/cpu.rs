@@ -87,9 +87,9 @@ impl CPU {
 
     pub fn load(&mut self, program: Vec<u8>) {
         self.memory[0x0600 .. (0x0600 + program.len())].copy_from_slice(&program[..]);
-        // Memory will be written (by slicing) from address 0x8000 to 0xXXXX, depending on program
+        // Memory will be written (by slicing) from address 0x0600 to 0xXXXX, depending on program
         self.mem_write_u16(0xFFFC, 0x0600); // program counter, stored in 0xFFFC 
-        // is set to 0x8000
+        // is set to 0x0600
     }
 
     fn get_operand_address(&mut self, mode: &AddressingMode) -> u16 {
