@@ -778,39 +778,39 @@ impl CPU {
         self.mem_write_u16(addr, 0x00);
     }
 
-    fn plus_minus(&mut self, value: u8) {
-        // based on the following resource:
+    fn plus_minus(&mut self, data: u8) {
+        // based on the following resource and the tutorial github
         // https://www.righto.com/2012/12/the-6502-overflow-flag-explained.html
 
-        let c6 = (self.status & 0b0000_0001) << 7;
+        let c6 = (self.status << 7) >> 7;
+        let sum = self.register_a as u16
+            + data as u16
+            + c6 as u16;
 
-        let sum: u16 = self.register_a as u16 + value as u16 + c6 as u16;
+        let carry = sum > 0xff;
 
-        let c7 = (sum >> 8) as u8; // extract carry of 8th bit
-
-        self.status =  self.status | c7; // insert correctly
+        if carry {
+            self.status = self.status | 0b0000_0001;
+        } else {
+            self.status = self.status & 0b1111_1110;
+        }
 
         let result = sum as u8;
 
-        if (result ^ self.register_a) & (result ^ value) & 0x80 != 0 {
-
+        if (data ^ result) & (result ^ self.register_a) & 0x80 != 0 {
             self.status = self.status | 0b0100_0000; // set overflow
         } else {
             self.status = self.status & 0b1011_1111; // unset overflow
         }
 
         self.register_a = result;
-
         self.update_zero_and_negative_flags(self.register_a);
-
     }
 
     fn adc(&mut self, mode: &AddressingMode) {
         let addr = self.get_operand_address(mode);
         let value = self.mem_read(addr);
-
         self.plus_minus(value);
-
     }
 
     fn sbc(&mut self, mode: &AddressingMode) {
