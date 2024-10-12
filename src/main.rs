@@ -162,6 +162,10 @@ fn main() {
         // This is supported by the fact that the colours of the machine code version range from 0-256, but only 16 here.
         // However, a hexdump of the testing resource's version of the game on first pass seems to be identical to this vector.
 
+        // [A*] The most likely answer is that the apples are generated exclusively from a pool of 16 positions 
+        // (or some function with input of 0-15 instead of 0-255 as in the original game code), instead of the 32x32 = 
+        // 1024 positions which could be generated in the the original game code. 
+
         if read_screen_state(cpu, &mut screen_state) { // update the screen if it needs to be updated
             texture.update(None, &screen_state, 32 * 3).unwrap();
             canvas.copy(&texture, None, None).unwrap();
