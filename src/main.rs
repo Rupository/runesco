@@ -5,7 +5,6 @@ pub mod bus;
 use cpu::Mem;
 use cpu::CPU;
 use rand::Rng;
-use bus::Bus;
 
 use sdl2::event::Event;
 use sdl2::EventPump;
@@ -64,16 +63,16 @@ fn handle_user_input(cpu: &mut CPU, event_pump: &mut EventPump) { // the address
            Event::Quit { .. } | Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
                std::process::exit(0)
            },
-           Event::KeyDown { keycode: Some(Keycode::W), .. } => {
+           Event::KeyDown { keycode: Some(Keycode::Up), .. } => {
                cpu.mem_write(0xff, 0x77);
            },
-           Event::KeyDown { keycode: Some(Keycode::S), .. } => {
+           Event::KeyDown { keycode: Some(Keycode::Down), .. } => {
                cpu.mem_write(0xff, 0x73);
            },
-           Event::KeyDown { keycode: Some(Keycode::A), .. } => {
+           Event::KeyDown { keycode: Some(Keycode::Left), .. } => {
                cpu.mem_write(0xff, 0x61);
            },
-           Event::KeyDown { keycode: Some(Keycode::D), .. } => {
+           Event::KeyDown { keycode: Some(Keycode::Right), .. } => {
                cpu.mem_write(0xff, 0x64);
            }
            _ => {/* do nothing */}
@@ -132,10 +131,10 @@ fn main() {
     ]; // taken from tutorial github, not book!
  
     //load the game
-    let bus = Bus::new();
-    let mut cpu = CPU::new(bus);
+    let mut cpu = CPU::new();
     cpu.load(game_code);
     cpu.reset();
+    cpu.program_counter = 0x0600;
  
     let mut screen_state = [0 as u8; 32 * 3 * 32]; // initialise the screen state array
     let mut rng = rand::thread_rng();
