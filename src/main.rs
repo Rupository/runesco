@@ -134,6 +134,17 @@ fn main() {
     let mut cpu = CPU::new();
     cpu.load(game_code);
     cpu.reset();
+
+    // The game will not run with just this, as even though the game address space gets mapped
+    // correctly (0x0600 lies withing the bounds of the RAM space that the bus provides, 0x0000 - 0x1FFF)
+    // The last part of the load: updating the program counter - will fail, as that is a read/write access
+    // ocurring at 0xFFFC, out of bounds for the BUS memmory allocation.
+
+    // A remnant of this issue can be seen in the terminal: invalid reads
+    // and writes to dec(0xFFFC) = 65532 (and 65533 as well, as program counter)
+    // is a u16 stored as two u8s in these two addresses.
+
+    // Hence, to manually ensure the game runs before this issue arises, we do:
     cpu.program_counter = 0x0600;
  
     let mut screen_state = [0 as u8; 32 * 3 * 32]; // initialise the screen state array
