@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use crate::opcodes;
+use crate::{bus::Bus, opcodes};
 
 
 pub struct CPU { // CPU with..  
@@ -9,7 +9,7 @@ pub struct CPU { // CPU with..
     pub stack_pointer: u8, // Stack Pointer
     pub status: u8, // Status flags [NV_BDIZC]
     pub program_counter: u16, // Program Counter
-    memory: [u8; 0xFFFF] // ...and 64 Kilobits of total memory space
+    pub bus: Bus, // ...and 64 Kilobits of total memory space
 }
 
 #[derive(Debug)]
@@ -51,15 +51,21 @@ pub trait Mem {
 }
 
 impl Mem for CPU {
-    
-    fn mem_read(&self, addr: u16) -> u8 { // returns next 8 bit integer instruction
-        self.memory[addr as usize] // from a 16 bit address, and converts to usize (compatibility)
+    fn mem_read(&self, addr: u16) -> u8 {
+        self.bus.mem_read(addr)
     }
-
-    fn mem_write(&mut self, addr: u16, data: u8) { // writes data to an address in memory
-        self.memory[addr as usize] = data; 
+ 
+    fn mem_write(&mut self, addr: u16, data: u8) {
+        self.bus.mem_write(addr, data)
     }
-}
+    fn mem_read_u16(&mut self, pos: u16) -> u16 {
+        self.bus.mem_read_u16(pos)
+    }
+  
+    fn mem_write_u16(&mut self, pos: u16, data: u16) {
+        self.bus.mem_write_u16(pos, data)
+    }
+ }
 
 impl CPU {
     
@@ -71,7 +77,7 @@ impl CPU {
             stack_pointer: 0xff,
             status: 0,
             program_counter: 0,
-            memory: [0; 0xFFFF]
+            bus: Bus::new(),
         }
     }
 
@@ -86,10 +92,10 @@ impl CPU {
     }
 
     pub fn load(&mut self, program: Vec<u8>) {
-        self.memory[0x0600 .. (0x0600 + program.len())].copy_from_slice(&program[..]);
-        // Memory will be written (by slicing) from address 0x0600 to 0xXXXX, depending on program
-        self.mem_write_u16(0xFFFC, 0x0600); // program counter, stored in 0xFFFC 
-        // is set to 0x0600
+        for i in 0..(program.len() as u16) { // Write the program at the ROM space, from 0x0600 - 0xXXXX
+            self.mem_write(0x0600 + i, program[i as usize]);
+        }
+        self.mem_write_u16(0xFFFC, 0x0600);
     }
 
     fn get_operand_address(&mut self, mode: &AddressingMode) -> u16 {
