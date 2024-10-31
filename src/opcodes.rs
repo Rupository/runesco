@@ -119,6 +119,8 @@ lazy_static! {
 
         OpCode::new(0xb8, "CLV", 1, 2, AddressingMode::NoneAddressing), //
 
+        OpCode::new(0xD8, "CLD", 1, 2, AddressingMode::NoneAddressing),
+
         OpCode::new(0xc9, "CMP", 2, 2, AddressingMode::Immediate), //
         OpCode::new(0xc5, "CMP", 2, 3, AddressingMode::ZeroPage),
         OpCode::new(0xd5, "CMP", 2, 4, AddressingMode::ZeroPage_X),
@@ -228,6 +230,8 @@ lazy_static! {
 
         OpCode::new(0x38, "SEC", 1, 2, AddressingMode::NoneAddressing), //
 
+        OpCode::new(0xf8, "SED", 1, 2, AddressingMode::NoneAddressing),
+        
         OpCode::new(0x78, "SEI", 1, 2, AddressingMode::NoneAddressing), //
 
         OpCode::new(0x86, "STX", 2, 3, AddressingMode::ZeroPage), //

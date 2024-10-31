@@ -84,9 +84,9 @@ impl CPU {
     pub fn reset(&mut self) { // resets when new cartridge is loaded
         self.register_a = 0;
         self.register_x = 0;
-        self.status = 0;
+        self.status = 0b100100;
 
-        self.stack_pointer = 0xff;
+        self.stack_pointer = 0xfd;
  
         self.program_counter = self.mem_read_u16(0xFFFC);
     }
@@ -556,6 +556,14 @@ impl CPU {
         self.status = self.status & 0b1111_1011;
     }
 
+    fn sed(&mut self) {
+        self.status = self.status | 0b0000_1000;
+    }
+
+    fn cld(&mut self) {
+        self.status = self.status & 0b1111_0111;
+    }
+
     fn clv(&mut self) {
         self.status = self.status & 0b1011_1111;
     }
@@ -571,6 +579,22 @@ impl CPU {
             self.status = self.status & 0b1111_1101;
             //otherwise, bitwise AND keeps everything else the same 
             //and sets Z to 0.
+        }
+
+        if (value & 0b0100_0000) == 0b0100_0000 { // if 6th bit is set
+            self.status = self.status | 0b0100_0000; // set V
+        } else {
+            self.status = self.status & 0b1011_1111;
+            //otherwise, bitwise AND keeps everything else the same 
+            //and unsets V
+        }
+
+        if (value & 0b1000_0000) == 0b1000_0000 { // if 6th bit is set
+            self.status = self.status | 0b1000_0000; // set N
+        } else {
+            self.status = self.status & 0b0111_1111;
+            //otherwise, bitwise AND keeps everything else the same 
+            //and unsets N
         }
 
         self.status = self.status | (value & 0b1100_0000); // bracketed potion gets bit 7 and
@@ -1033,6 +1057,10 @@ impl CPU {
                 0x78 => self.sei(),
 
                 0x58 => self.cli(),
+
+                0xf8 => self.sed(),
+
+                0xd8 => self.cld(),
 
                 0xb8 => self.clv(),
 
