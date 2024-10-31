@@ -2,23 +2,26 @@ pub mod cpu;
 pub mod opcodes;
 pub mod bus;
 pub mod cartridge;
+pub mod trace;
 
 use cpu::Mem;
 use cpu::CPU;
 use bus::Bus;
-use rand::Rng;
+//use rand::Rng;
 use cartridge::Rom;
+use trace:: trace;
 
 use sdl2::event::Event;
 use sdl2::EventPump;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
 use sdl2::pixels::PixelFormatEnum;
-use std::time::Duration;
+// use std::time::Duration;
 
 #[macro_use]
 extern crate lazy_static;
 
+#[allow(dead_code)]
 fn read_screen_state(cpu: &CPU, frame: &mut [u8; 32 * 3 * 32]) -> bool { 
     // Takes the state of the CPU and the screen, represented as a 32*3*32 sized array.
     // Returns whether it has been/needs to be updated or not.
@@ -59,7 +62,7 @@ fn color(byte: u8) -> Color { // White for Snake, Black for BG, varying colours
    }
 }
 
-
+#[allow(dead_code)]
 fn handle_user_input(cpu: &mut CPU, event_pump: &mut EventPump) { // the address 0xFF stores the lates user input
    for event in event_pump.poll_iter() {
        match event {
@@ -95,6 +98,7 @@ fn main() {
 
     // A 'canvas': something which can be 'drawn' on is put over the window
     let mut canvas = window.into_canvas().present_vsync().build().unwrap();
+    #[allow(unused_variables, unused_mut)]
     let mut event_pump = sdl_context.event_pump().unwrap();
     canvas.set_scale(20.0, 20.0).unwrap();
 
@@ -103,6 +107,7 @@ fn main() {
 
     // The canvas is given a 'texture': which handles visuals.
     let creator = canvas.texture_creator();
+    #[allow(unused_variables, unused_mut)]
     let mut texture = creator
         .create_texture_target(PixelFormatEnum::RGB24, 32, 32).unwrap();
         // We specify that the visuals are in the form of 32x32 pixelated grid
@@ -110,23 +115,25 @@ fn main() {
         // 32x32x3 array of bytes.
  
     //load the game
-    let nes_file_data: Vec<u8> = std::fs::read("snake.nes").unwrap();
+    let nes_file_data: Vec<u8> = std::fs::read("nestest.nes").unwrap();
     let rom = Rom::new(&nes_file_data).unwrap();
 
     let bus = Bus::new(rom);
     let mut cpu = CPU::new(bus);
     cpu.reset();
  
-    let mut screen_state = [0 as u8; 32 * 3 * 32]; // initialise the screen state array
-    let mut rng = rand::thread_rng();
+    // let mut screen_state = [0 as u8; 32 * 3 * 32]; // initialise the screen state array
+    // let mut rng = rand::thread_rng();
 
     // run the game cycle
-    cpu.run_with_callback(move |cpu| { 
+    cpu.run_with_callback(move |cpu| {
+
+        println!("{}", trace(cpu)); 
         // CPU is moved (explicitly borrowed) so that nothing outside the gameloop
         // can change the CPU state.
 
-        handle_user_input(cpu, &mut event_pump);
-        cpu.mem_write(0xfe, rng.gen_range(1, 16)); 
+        // handle_user_input(cpu, &mut event_pump);
+        // cpu.mem_write(0xfe, rng.gen_range(1, 16)); 
         // writes a random number, stored at 0xfe, spawning an apple with 16 possible
         // random colours when read.
 
@@ -151,13 +158,13 @@ fn main() {
         // (or some function with input of 0-15 instead of 0-255 as in the original game code), instead of the 32x32 = 
         // 1024 positions which could be generated in the the original game code. 
 
-        if read_screen_state(cpu, &mut screen_state) { // update the screen if it needs to be updated
-            texture.update(None, &screen_state, 32 * 3).unwrap();
-            canvas.copy(&texture, None, None).unwrap();
-            canvas.present();
-        }
+        //if read_screen_state(cpu, &mut screen_state) { // update the screen if it needs to be updated
+            //texture.update(None, &screen_state, 32 * 3).unwrap();
+            //canvas.copy(&texture, None, None).unwrap();
+            //canvas.present();
+        //}
 
-        ::std::thread::sleep(Duration::new(0, 10_000)); // slows down pace for playability
+        //::std::thread::sleep(Duration::new(0, 10_000)); // slows down pace for playability
     });
  }
  

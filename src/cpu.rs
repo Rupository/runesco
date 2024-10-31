@@ -74,8 +74,8 @@ impl CPU {
             register_a: 0,
             register_x: 0,
             register_y: 0,
-            stack_pointer: 0xff,
-            status: 0,
+            stack_pointer: 0xfd,
+            status: 0b100100,
             program_counter: 0,
             bus: bus,
         }
@@ -98,72 +98,76 @@ impl CPU {
         self.mem_write_u16(0xFFFC, 0x0600);
     }
 
-    fn get_operand_address(&mut self, mode: &AddressingMode) -> u16 {
-
+    pub fn get_absolute_address(&mut self, mode: &AddressingMode, addr: u16) -> u16 {
         match mode {
-            AddressingMode::Immediate => self.program_counter, // Not really an addressing mode:
-            // gives whatever hex value is in the instruction as the value to be used.
- 
-            AddressingMode::ZeroPage  => self.mem_read(self.program_counter) as u16,
+            AddressingMode::ZeroPage => self.mem_read(addr) as u16,
             // Gets u8 address from program counter, of which only 
             // the last two bits of converted the u16 will be relevant.
             // Only access first 256 bytes of memory
-    
-            AddressingMode::Absolute => self.mem_read_u16(self.program_counter),
+
+            AddressingMode::Absolute => self.mem_read_u16(addr),
             // full u16 address is read, can access 0-65536 bytes.
-         
-            AddressingMode::ZeroPage_X => { 
+
+            AddressingMode::ZeroPage_X => {
                 // Takes 0-page address and adds the value stored
                 // in the X register to it. Wraps around if $ff, X (X>0)
-                let pos = self.mem_read(self.program_counter);
+                let pos = self.mem_read(addr);
                 let addr = pos.wrapping_add(self.register_x) as u16;
                 addr
             }
             AddressingMode::ZeroPage_Y => {
                 // See 0-page X
-                let pos = self.mem_read(self.program_counter);
+                let pos = self.mem_read(addr);
                 let addr = pos.wrapping_add(self.register_y) as u16;
                 addr
             }
- 
+
             AddressingMode::Absolute_X => {
                 // Takes absolute address and adds the value stored
                 // in the X register to it. Wraps around if $ff, X (X>0)
-                let base = self.mem_read_u16(self.program_counter);
+                let base = self.mem_read_u16(addr);
                 let addr = base.wrapping_add(self.register_x as u16);
                 addr
             }
             AddressingMode::Absolute_Y => {
                 // See absolute X
-                let base = self.mem_read_u16(self.program_counter);
+                let base = self.mem_read_u16(addr);
                 let addr = base.wrapping_add(self.register_y as u16);
                 addr
             }
- 
+
             AddressingMode::Indirect_X => {
                 // Gets a 0-page memory address
-                let base = self.mem_read(self.program_counter);
- 
+                let base = self.mem_read(addr);
+
                 let ptr: u8 = (base as u8).wrapping_add(self.register_x); // adds what's in X to it
                 let lo = self.mem_read(ptr as u16); // reads what's at the pointer
                 let hi = self.mem_read(ptr.wrapping_add(1) as u16); // and then at pointer + 1
                 u16::from_le_bytes([lo,hi]) // converts to full memory address $hilo
-                
             }
             AddressingMode::Indirect_Y => {
                 // Gets a 0-page memory address
-                let base = self.mem_read(self.program_counter);
- 
+                let base = self.mem_read(addr);
+
                 let lo = self.mem_read(base as u16); // reads what's at pointer 
                 let hi = self.mem_read((base as u8).wrapping_add(1) as u16); // reads whats at pointer + 1
                 let deref_base = u16::from_le_bytes([lo,hi]); // combines into full address, dereferncing base
                 let deref = deref_base.wrapping_add(self.register_y as u16); // adds whats's in Y to deref-ed address.
                 deref
             }
-          
-            AddressingMode::NoneAddressing => {
+
+            _ => {
                 panic!("mode {:?} is not supported", mode);
             }
+        }
+    }
+
+    fn get_operand_address(&mut self, mode: &AddressingMode) -> u16 {
+        match mode {
+            AddressingMode::Immediate => self.program_counter,
+            // gives whatever hex value is in the instruction as the value to be used.
+
+            _ => self.get_absolute_address(mode, self.program_counter),
         }
     }
 
