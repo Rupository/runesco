@@ -157,7 +157,7 @@ fn main() {
             canvas.present();
         }
 
-        ::std::thread::sleep(Duration::new(0, 70_000)); // slows down pace for playability
+        ::std::thread::sleep(Duration::new(0, 10_000)); // slows down pace for playability
     });
  }
  
