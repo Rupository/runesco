@@ -92,7 +92,7 @@ lazy_static! {
         OpCode::new(0x06, "ASL", 2, 5, AddressingMode::ZeroPage), //
         OpCode::new(0x16, "ASL", 2, 6, AddressingMode::ZeroPage_X),
         OpCode::new(0x0e, "ASL", 3, 6, AddressingMode::Absolute),
-        OpCode::new(0x15, "ASL", 3, 7, AddressingMode::Absolute_X),
+        OpCode::new(0x1e, "ASL", 3, 7, AddressingMode::Absolute_X),
 
         OpCode::new(0x90, "BCC", 2, 2/*+1 on success, +2 on new page*/, AddressingMode::NoneAddressing), //
         
@@ -101,7 +101,7 @@ lazy_static! {
         OpCode::new(0xf0, "BEQ", 2, 2/*+1 on success, +2 on new page*/, AddressingMode::NoneAddressing), //
 
         OpCode::new(0x24, "BIT", 2, 3/*+1 on success, +2 on new page*/, AddressingMode::ZeroPage), //
-        OpCode::new(0x2c, "BIT", 2, 3/*+1 on success, +2 on new page*/, AddressingMode::Absolute),
+        OpCode::new(0x2c, "BIT", 3, 4/*+1 on success, +2 on new page*/, AddressingMode::Absolute),
 
         OpCode::new(0x30, "BMI", 2, 2/*+1 on success, +2 on new page*/, AddressingMode::NoneAddressing), //
 
@@ -132,11 +132,11 @@ lazy_static! {
 
         OpCode::new(0xe0, "CPX", 2, 2, AddressingMode::Immediate), //
         OpCode::new(0xe4, "CPX", 2, 3, AddressingMode::ZeroPage),
-        OpCode::new(0xec, "CPX", 2, 4, AddressingMode::Absolute),
+        OpCode::new(0xec, "CPX", 3, 4, AddressingMode::Absolute),
 
         OpCode::new(0xc0, "CPY", 2, 2, AddressingMode::Immediate), //
         OpCode::new(0xc4, "CPY", 2, 3, AddressingMode::ZeroPage),
-        OpCode::new(0xcc, "CPY", 2, 4, AddressingMode::Absolute),
+        OpCode::new(0xcc, "CPY", 3, 4, AddressingMode::Absolute),
 
         OpCode::new(0xc6, "DEC", 2, 5, AddressingMode::ZeroPage), //
         OpCode::new(0xd6, "DEC", 2, 6, AddressingMode::ZeroPage_X),
@@ -235,11 +235,11 @@ lazy_static! {
         OpCode::new(0x78, "SEI", 1, 2, AddressingMode::NoneAddressing), //
 
         OpCode::new(0x86, "STX", 2, 3, AddressingMode::ZeroPage), //
-        OpCode::new(0x96, "STX", 2, 4, AddressingMode::ZeroPage_X),
+        OpCode::new(0x96, "STX", 2, 4, AddressingMode::ZeroPage_Y),
         OpCode::new(0x8e, "STX", 3, 4, AddressingMode::Absolute),
 
         OpCode::new(0x84, "STY", 2, 3, AddressingMode::ZeroPage), //
-        OpCode::new(0x94, "STY", 2, 4, AddressingMode::ZeroPage_Y),
+        OpCode::new(0x94, "STY", 2, 4, AddressingMode::ZeroPage_X),
         OpCode::new(0x8c, "STY", 3, 4, AddressingMode::Absolute),
     ];
 

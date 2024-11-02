@@ -358,8 +358,10 @@ impl CPU {
 
         let check = self.register_a.wrapping_sub(value);
 
-        if (check as i8) >= 0 {
+        if self.register_a >= value {
             self.sec();
+        } else {
+            self.clc()
         }
         self.update_zero_and_negative_flags(check);
     }
@@ -370,8 +372,10 @@ impl CPU {
 
         let check = self.register_x.wrapping_sub(value);
 
-        if (check as i8) >= 0 {
+        if self.register_x >= value {
             self.sec();
+        } else {
+            self.clc()
         }
         self.update_zero_and_negative_flags(check);
     }
@@ -382,8 +386,10 @@ impl CPU {
 
         let check = self.register_y.wrapping_sub(value);
 
-        if (check as i8) >= 0 {
+        if self.register_y >= value {
             self.sec();
+        } else {
+            self.clc()
         }
         self.update_zero_and_negative_flags(check);
     }
@@ -518,7 +524,7 @@ impl CPU {
 
             let addr = self.get_operand_address(mode);
             let mut value = self.mem_read(addr);
-            if value & 0b1000_0000 != 0 { // if 7th (last) bit of register is set, checked w/ bitwise AND
+            if value & 0b0000_0001 != 0 { // if 7th (last) bit of register is set, checked w/ bitwise AND
                 self.sec(); 
                 // C (carry flag) is set to 1 with bitwise OR, see below
             } else {
@@ -739,13 +745,34 @@ impl CPU {
     }
 
     fn jmp(&mut self, mode: &AddressingMode) {
-        let addr = self.get_operand_address(mode);
-        self.program_counter = addr;
+
+        if mode == &AddressingMode::NoneAddressing { // INDIRECT ADDRESSING
+            let addr = self.mem_read_u16(self.program_counter);
+
+                    //6502 bug mode with with page boundary:
+                    //  if address $3000 contains $40, $30FF contains $80, and $3100 contains $50,
+                    // the result of JMP ($30FF) will be a transfer of control to $4080 rather than $5080 as you intended
+                    // i.e. the 6502 took the low byte of the address from $30FF and the high byte from $3000
+
+                    let mut indirect_ref = self.mem_read_u16(addr);
+
+                    if (addr & 0x00FF) == 0x00FF {
+                        let lo = self.mem_read(addr);
+                        let hi = self.mem_read(addr & 0xFF00);
+                        indirect_ref = u16::from_le_bytes([lo,hi]);
+                    }
+
+                    self.program_counter = indirect_ref;
+        }
+        else {
+            let addr = self.get_operand_address(mode);
+            self.program_counter = addr;
+        }
     }
 
     fn pha(&mut self) {
         let copy = self.register_a;
-        let addr = 0x0100 + ((0xff - self.stack_pointer) as u16);
+        let addr = 0x0100 + ((self.stack_pointer) as u16);
 
         self.mem_write(addr, copy);
         self.stack_pointer -= 1; // wrapping is not used here as rust will panic on overflow,
@@ -753,10 +780,9 @@ impl CPU {
     }
 
     fn php(&mut self) {
-        self.status = self.status | 0b0001_0000; // set B flag
+        let copy = self.status | 0b0001_0000; // set B flag for copy being pushed to stack
         
-        let copy = self.status;
-        let addr = 0x0100 + ((0xff - self.stack_pointer) as u16);
+        let addr = 0x0100 + ((self.stack_pointer) as u16);
 
         self.mem_write(addr, copy);
         self.stack_pointer -= 1;
@@ -767,49 +793,77 @@ impl CPU {
         // implicitly encoding it.
 
         // Added to SP before rest of the pull ensures correct indexing for memory address.
-        let addr = 0x0100 + ((0xff - self.stack_pointer) as u16);
+        let addr = 0x0100 + ((self.stack_pointer) as u16);
         self.register_a = self.mem_read(addr);
-
-        self.mem_write(addr, 0x00);
         
+        // NOTE: NO NEED TO RESET VALUE TO 0x00 AT THAT POSITION.
+
         self.update_zero_and_negative_flags(self.register_a);
     }
 
     fn plp(&mut self) {
         self.stack_pointer += 1;
-        let addr = 0x0100 + ((0xff - self.stack_pointer) as u16);
+        let addr = 0x0100 + ((self.stack_pointer) as u16);
         self.status = self.mem_read(addr);
 
-        self.mem_write(addr, 0x00);
+        if (self.status & 0b0001_0000) == 0b0001_0000 { // if B flag is set in stack status
+            self.status = self.status & 0b1110_1111 // unset it
+        }
+
+        self.status = self.status | 0b0010_0000; // set empty flag (always set to 1)
     }
 
     fn jsr(&mut self, mode: &AddressingMode) {
-        let stack_addr = 0x0100 + ((0xff - self.stack_pointer) as u16);
-        self.mem_write_u16(stack_addr, self.program_counter - 1);
-        self.stack_pointer -= 2; // Program counter takes two units of memory space as it is u16
+        let mut stack_addr = 0x0100 + ((self.stack_pointer) as u16);
+        
+        let future_pc = self.program_counter + 1;
+
+        let hi = (future_pc >> 8) as u8;
+        let lo = (future_pc & 0xff) as u8;
+
+        self.mem_write(stack_addr, hi);
+        self.stack_pointer -= 1;
+        stack_addr -= 1;
+
+        self.mem_write(stack_addr, lo);
+        self.stack_pointer -= 1;
 
         let addr = self.get_operand_address(mode);
         self.program_counter = addr;
     }
 
     fn rts(&mut self) { 
-        self.stack_pointer += 2;
-        let addr = 0x0100 + ((0xff - self.stack_pointer) as u16);
-        self.program_counter = self.mem_read_u16(addr) + 3;
-        self.mem_write_u16(addr, 0x00);
+        self.stack_pointer += 1;
+        let mut stack_addr = 0x0100 + ((self.stack_pointer) as u16);
+        let lo = self.mem_read(stack_addr);
+
+        self.stack_pointer +=1;
+        stack_addr += 1;
+        let hi = self.mem_read(stack_addr);
+
+        self.program_counter = u16::from_le_bytes([lo,hi]) + 1;
     }
 
     fn rti(&mut self) {
         self.stack_pointer += 1;
-        let mut addr = 0x0100 + ((0xff - self.stack_pointer) as u16);
-        self.status = self.mem_read(addr);
-        self.mem_write(addr, 0x00);
-        
-        addr = addr - 1;
+        let mut stack_addr = 0x0100 + (self.stack_pointer as u16);
+        self.status = self.mem_read(stack_addr);
 
-        self.stack_pointer += 2;
-        self.program_counter = self.mem_read_u16(addr)+3;
-        self.mem_write_u16(addr, 0x00);
+        if (self.status & 0b0001_0000) == 0b0001_0000 { // if B flag is set in stack status
+            self.status = self.status & 0b1110_1111 // unset it
+        }
+
+        self.status = self.status | 0b0010_0000; // set empty flag (always set to 1)
+    
+        self.stack_pointer += 1;
+        stack_addr += 1;
+        let lo = self.mem_read(stack_addr);
+    
+        self.stack_pointer += 1;
+        stack_addr += 1;
+        let hi = self.mem_read(stack_addr);
+
+        self.program_counter = u16::from_le_bytes([lo,hi]);
     }
 
     fn plus_minus(&mut self, data: u8) {
@@ -1063,9 +1117,7 @@ impl CPU {
                 0xd8 => self.cld(),
 
                 0xb8 => self.clv(),
-
-                //0x90 => self.bcc(),
-
+                
                 0xea => {} , // NOP
 
                 0x00 => { // BRK
