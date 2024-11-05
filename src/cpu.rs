@@ -550,6 +550,10 @@ impl CPU {
         self.status = self.status | 0b0000_0001;
     }
 
+    fn set_v(&mut self) {
+        self.status = self.status | 0b0100_0000;
+    }
+
     fn clc(&mut self) {
         self.status = self.status & 0b1111_1110;
     }
@@ -909,6 +913,113 @@ impl CPU {
         self.plus_minus(value); // X - Y ==  X + -Y, and -Y == !Y  in signed complements.
     }
 
+    fn dcp(&mut self, mode: &AddressingMode) {
+        let addr = self.get_operand_address(mode);
+        let mut value = self.mem_read(addr);
+
+        value = value.wrapping_sub(1);
+        self.mem_write(addr, value);
+
+        if value <= self.register_a {
+            self.sec();
+        }
+
+        self.update_zero_and_negative_flags(self.register_a.wrapping_sub(value));
+
+    }
+
+    fn rla(&mut self, mode: &AddressingMode) {
+        self.rol(mode);
+        self.and(mode);
+    }
+
+    fn slo(&mut self, mode: &AddressingMode) {
+        self.asl(mode);
+        self.ora(mode);
+    }
+
+    fn sre(&mut self, mode: &AddressingMode) {
+        self.lsr(mode);
+        self.eor(mode);
+    }
+
+    fn axs(&mut self, mode: &AddressingMode) {
+        let addr = self.get_operand_address(mode);
+        let value = self.mem_read(addr);
+
+        if value <=  (self.register_a & self.register_x){
+            self.sec();
+        }
+
+        let result = (self.register_a & self.register_x).wrapping_sub(value);
+        self.register_x = result;
+
+        self.update_zero_and_negative_flags(self.register_x);
+    }
+
+    fn arr(&mut self, mode: &AddressingMode) {
+        self.and(mode);
+        self.ror(mode);
+
+        let b5 = (self.register_a >> 5) & 1;
+        let b6 = (self.register_a >> 6) & 1;
+
+        if b5 == 1 && b6 == 1 {
+            self.sec();
+            self.clv();
+        }
+        else if b5 == 0 && b6 == 0 {
+            self.clc();
+            self.clv();
+        }
+        else if b5 == 1 && b6 == 0 {
+            self.set_v();
+            self.clc();
+        }
+        else if b5 == 0 && b6 == 1 {
+            self.sec();
+            self.set_v();
+        }
+    }
+
+    fn anc(&mut self, mode: &AddressingMode) {
+        self.and(mode);
+
+        if self.status & 0b1000_0000 == 0b1000_0000 {
+            self.sec();
+        }
+        else {
+            self.clc();
+        }
+    }
+
+    fn alr(&mut self, mode: &AddressingMode) {
+        self.and(mode);
+        self.lsr(mode);
+    }
+
+    fn rra(&mut self, mode: &AddressingMode) {
+        self.ror(mode);
+        self.adc(mode);
+    }
+
+    fn isb(&mut self, mode: &AddressingMode) {
+        self.inc(mode);
+        self.sbc(mode);
+    }
+
+    fn lax(&mut self, mode: &AddressingMode) {
+        self.lda(mode);
+        self.ldx(mode);
+    }
+
+    fn sax(&mut self, mode: &AddressingMode) {
+        let addr = self.get_operand_address(mode);
+        let data = self.register_a & self.register_x;
+
+        self.mem_write(addr, data);
+    }
+
     pub fn run(&mut self) {
         self.run_with_callback(|_| {}); // This is a closure. A closure is like a function except it captures values
         // from its environment (that is, rust intelligently infers the type it will be operating with without needing to be told explicitly)
@@ -994,7 +1105,7 @@ impl CPU {
                     self.and(&opcode.mode);
                 }
 
-                0xe9 | 0xe5 | 0xf5 | 0xed | 0xfd | 0xf9 | 0xe1 | 0xf1 => {
+                0xe9 | 0xe5 | 0xf5 | 0xed | 0xfd | 0xf9 | 0xe1 | 0xf1 /* unofficial -> */ | 0xeb => {
                     self.sbc(&opcode.mode);
                 }
 
@@ -1118,7 +1229,66 @@ impl CPU {
 
                 0xb8 => self.clv(),
                 
-                0xea => {} , // NOP
+                0xea /* <- main*/ | 0x1a | 0x3a | 0x5a | 0x7a | 0xda | 0xfa 
+                | 0x02 | 0x12 | 0x22 | 0x32 | 0x42 | 0x52 | 0x62 | 0x72 | 0x92 | 0xb2 | 0xd2 | 0xf2=> {
+                    // NOP basic and KIL
+                },
+
+                // Other NOPs which read memory
+                0x04 | 0x44 | 0x64 | 0x14 | 0x34 | 0x54 | 0x74 | 0xd4 | 0xf4 | 0x0c | 0x1c
+                | 0x3c | 0x5c | 0x7c | 0xdc | 0xfc | 0x80 | 0x82 | 0x89 | 0xc2 | 0xe2 => {
+                    let addr = self.get_operand_address(&opcode.mode);
+                    #[allow(unused_variables)]
+                    let data = self.mem_read(addr);
+                }
+
+                0xc7 | 0xd7 | 0xCF | 0xdF | 0xdb | 0xd3 | 0xc3 => {
+                    self.dcp(&opcode.mode)
+                },
+
+                0x27 | 0x37 | 0x2F | 0x3F | 0x3b | 0x33 | 0x23 => {
+                    self.rla(&opcode.mode)
+                },
+
+                0x07 | 0x17 | 0x0F | 0x1f | 0x1b | 0x03 | 0x13 =>  {
+                    self.slo(&opcode.mode)
+                }
+
+                0x47 | 0x57 | 0x4F | 0x5f | 0x5b | 0x43 | 0x53 => {
+                    self.sre(&opcode.mode)
+                }
+
+                0xcb => {
+                    self.axs(&opcode.mode)
+                }
+
+                0x6b => {
+                    self.arr(&opcode.mode);
+                }
+
+                0x0b | 0x2b => {
+                    self.anc(&opcode.mode);
+                }
+
+                0x4b => {
+                    self.alr(&opcode.mode);
+                }
+
+                0x67 | 0x77 | 0x6f | 0x7f | 0x7b | 0x63 | 0x73 => {
+                    self.rra(&opcode.mode);
+                }
+
+                0xe7 | 0xf7 | 0xef | 0xff | 0xfb | 0xe3 | 0xf3 => {
+                    self.isb(&opcode.mode);
+                }
+
+                0xa7 | 0xb7 | 0xaf | 0xbf | 0xa3 | 0xb3 => {
+                    self.lax(&opcode.mode);
+                }
+
+                0x87 | 0x97 | 0x8f | 0x83 => {
+                    self.sax(&opcode.mode);
+                }
 
                 0x00 => { // BRK
                     self.status = self.status | 0b0001_0000; // set B flag
