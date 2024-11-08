@@ -4,6 +4,8 @@ pub mod bus;
 pub mod cartridge;
 pub mod trace;
 
+pub mod ppu;
+
 use cpu::Mem;
 use cpu::CPU;
 use bus::Bus;
@@ -22,7 +24,7 @@ use sdl2::pixels::PixelFormatEnum;
 extern crate lazy_static;
 
 #[allow(dead_code)]
-fn read_screen_state(cpu: &CPU, frame: &mut [u8; 32 * 3 * 32]) -> bool { 
+fn read_screen_state(cpu: &mut CPU, frame: &mut [u8; 32 * 3 * 32]) -> bool { 
     // Takes the state of the CPU and the screen, represented as a 32*3*32 sized array.
     // Returns whether it has been/needs to be updated or not.
 
