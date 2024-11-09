@@ -30,6 +30,7 @@ pub struct NesPPU {
 
     scanline: u16,
     cycles: usize,
+    pub nmi_interrupt: Option<u8>,
 
 }
 
@@ -60,6 +61,7 @@ impl NesPPU {
 
             scanline:0,
             cycles:0,
+            nmi_interrupt: None,
         }
     }
 
@@ -70,14 +72,17 @@ impl NesPPU {
             self.scanline += 1;
  
             if self.scanline == 241 {
+                self.status.set_vblank_status(true);
+                self.status.set_sprite_zero_hit(false); // prepares sprite hit for the next frame
                 if self.ctrl.generate_vblank_nmi() {
-                    self.status.set_vblank_status(true);
-                    todo!("Should trigger NMI interrupt")
+                    self.nmi_interrupt = Some(1);
                 }
             }
  
             if self.scanline >= 262 {
                 self.scanline = 0;
+                self.nmi_interrupt = None;
+                self.status.set_sprite_zero_hit(false); // redundant?
                 self.status.reset_vblank_status();
                 return true;
             }

@@ -71,6 +71,31 @@ fn page_cross(addr1: u16, addr2 : u16) -> bool {
     addr1 & 0xFF00 != addr2 & 0xFF00
 }
 
+mod interrupt {
+    #[derive(PartialEq, Eq)]
+    pub enum InterruptType {
+        NMI,
+    }
+
+    #[derive(PartialEq, Eq)]
+
+    // pub: Normally, this makes an item public, meaning it is accessible from any other module.
+    // super: This refers to the parent module of the current module. The super keyword is used to access 
+    // the parent scope in Rust, specifically the CPU here
+    pub(super) struct Interrupt {
+        pub(super) itype: InterruptType, // NMI/IRQ/BRK (some unimplemented)
+        pub(super) vector_addr: u16, // Location PPU jumps to on an interrupt
+        pub(super) b_flag_mask: u8, // ensures correctly masked flags [?]
+        pub(super) cpu_cycles: u8, // cycles the interrupt consumes
+    }
+    pub(super) const NMI: Interrupt = Interrupt {
+        itype: InterruptType::NMI,
+        vector_addr: 0xfffA,
+        b_flag_mask: 0b00100000,
+        cpu_cycles: 2,
+    };
+}
+
 impl CPU {
     
     pub fn new(bus: Bus) -> Self {
@@ -1126,6 +1151,36 @@ impl CPU {
         self.mem_write(addr, data);
     }
 
+    fn interrupt(&mut self, interrupt: interrupt::Interrupt) {
+        // self.stack_push_u16(self.program_counter);
+
+        let hi = (self.program_counter >> 8) as u8;
+        let lo = (self.program_counter & 0xff) as u8;
+        let mut addr = 0x0100 + ((self.stack_pointer) as u16);
+
+        self.mem_write(addr, hi);
+        self.stack_pointer -= 1;
+
+        addr = 0x0100 + ((self.stack_pointer) as u16);
+        self.mem_write(addr, lo);
+        self.stack_pointer -= 1;
+
+        let mut flag = self.status.clone();
+
+        flag = flag & 0b1110_1111; // unset B flag
+        flag = flag | 0b0010_0000; // set Unused flag
+
+        addr = 0x0100 + ((self.stack_pointer) as u16);
+
+        self.mem_write(addr, flag);
+        self.stack_pointer -= 1;
+
+        self.status = self.status | 0b0000_0100; // set I (disable all additional Interrupts) flag
+
+        self.bus.tick(interrupt.cpu_cycles);
+        self.program_counter = self.mem_read_u16(interrupt.vector_addr);
+    }
+
     pub fn run(&mut self) {
         self.run_with_callback(|_| {}); // This is a closure. A closure is like a function except it captures values
         // from its environment (that is, rust intelligently infers the type it will be operating with without needing to be told explicitly)
@@ -1172,6 +1227,10 @@ impl CPU {
         // deref with *.
 
         loop {
+            if let Some(_nmi) = self.bus.poll_nmi_status() {
+                self.interrupt(interrupt::NMI);
+            }
+
             callback(self); // Queue the inputs (orders) and execute them as and when possible...
             
             // ... while the current known inputs can be processed.
