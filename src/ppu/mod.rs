@@ -57,8 +57,10 @@ impl NesPPU {
         }
     }
 
-    // For in depth reasoning
+    // For some reasoning
     // https://chatgpt.com/g/g-GbLbctpPz-universal-primer/c/672da542-9748-8002-94b8-817c14f362dd
+    // and this video:
+    // https://www.youtube.com/watch?v=7Co_8dC2zb8
 
     // Mirroring screens
 
