@@ -13,6 +13,7 @@ pub struct Bus {
     cpu_vram: [u8; 2048], // 2KiB of Ram, from 0x0000 to 0x2000 (with higest two bits 0-ed)
     prg_rom: Vec<u8>,
     ppu: NesPPU,
+    cycles: usize,
 }
 
 impl Bus {
@@ -24,7 +25,13 @@ impl Bus {
             cpu_vram: [0; 2048],
             prg_rom: rom.prg_rom,
             ppu: ppu,
+            cycles: 0,
         }
+    }
+
+    pub fn tick(&mut self, cycles: u8) {
+        self.cycles += cycles as usize;
+        self.ppu.tick(cycles * 3);
     }
 
     fn read_prg_rom(&self, mut addr: u16) -> u8 {

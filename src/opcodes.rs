@@ -100,8 +100,8 @@ lazy_static! {
         
         OpCode::new(0xf0, "BEQ", 2, 2/*+1 on success, +2 on new page*/, AddressingMode::NoneAddressing), //
 
-        OpCode::new(0x24, "BIT", 2, 3/*+1 on success, +2 on new page*/, AddressingMode::ZeroPage), //
-        OpCode::new(0x2c, "BIT", 3, 4/*+1 on success, +2 on new page*/, AddressingMode::Absolute),
+        OpCode::new(0x24, "BIT", 2, 3, AddressingMode::ZeroPage), //
+        OpCode::new(0x2c, "BIT", 3, 4, AddressingMode::Absolute),
 
         OpCode::new(0x30, "BMI", 2, 2/*+1 on success, +2 on new page*/, AddressingMode::NoneAddressing), //
 
@@ -296,7 +296,7 @@ lazy_static! {
         OpCode::new(0x89, "*NOP", 2,2, AddressingMode::Immediate),
         OpCode::new(0xc2, "*NOP", 2,2, AddressingMode::Immediate),
         OpCode::new(0xe2, "*NOP", 2,2, AddressingMode::Immediate),
-        // Seperation because of PPU cycle count, may come in handy later?
+        // Seperation because of cycle count, may come in handy later?
         OpCode::new(0x04, "*NOP", 2,3, AddressingMode::ZeroPage), //
         OpCode::new(0x44, "*NOP", 2,3, AddressingMode::ZeroPage),
         OpCode::new(0x64, "*NOP", 2,3, AddressingMode::ZeroPage),

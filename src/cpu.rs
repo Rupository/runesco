@@ -65,7 +65,11 @@ impl Mem for CPU {
     fn mem_write_u16(&mut self, pos: u16, data: u16) {
         self.bus.mem_write_u16(pos, data)
     }
- }
+}
+
+fn page_cross(addr1: u16, addr2 : u16) -> bool {
+    addr1 & 0xFF00 != addr2 & 0xFF00
+}
 
 impl CPU {
     
@@ -98,14 +102,15 @@ impl CPU {
         self.mem_write_u16(0xFFFC, 0x0600);
     }
 
-    pub fn get_absolute_address(&mut self, mode: &AddressingMode, addr: u16) -> u16 {
+    pub fn get_absolute_address(&mut self, mode: &AddressingMode, addr: u16) -> (u16, bool) {
+        // returns address and whether page has been crossed or not
         match mode {
-            AddressingMode::ZeroPage => self.mem_read(addr) as u16,
+            AddressingMode::ZeroPage => (self.mem_read(addr) as u16, false),
             // Gets u8 address from program counter, of which only 
             // the last two bits of converted the u16 will be relevant.
             // Only access first 256 bytes of memory
 
-            AddressingMode::Absolute => self.mem_read_u16(addr),
+            AddressingMode::Absolute => (self.mem_read_u16(addr),false),
             // full u16 address is read, can access 0-65536 bytes.
 
             AddressingMode::ZeroPage_X => {
@@ -113,13 +118,13 @@ impl CPU {
                 // in the X register to it. Wraps around if $ff, X (X>0)
                 let pos = self.mem_read(addr);
                 let addr = pos.wrapping_add(self.register_x) as u16;
-                addr
+                (addr, false)
             }
             AddressingMode::ZeroPage_Y => {
                 // See 0-page X
                 let pos = self.mem_read(addr);
                 let addr = pos.wrapping_add(self.register_y) as u16;
-                addr
+                (addr, false)
             }
 
             AddressingMode::Absolute_X => {
@@ -127,13 +132,13 @@ impl CPU {
                 // in the X register to it. Wraps around if $ff, X (X>0)
                 let base = self.mem_read_u16(addr);
                 let addr = base.wrapping_add(self.register_x as u16);
-                addr
+                (addr, page_cross(base, addr))
             }
             AddressingMode::Absolute_Y => {
                 // See absolute X
                 let base = self.mem_read_u16(addr);
                 let addr = base.wrapping_add(self.register_y as u16);
-                addr
+                (addr, page_cross(base, addr))
             }
 
             AddressingMode::Indirect_X => {
@@ -143,7 +148,9 @@ impl CPU {
                 let ptr: u8 = (base as u8).wrapping_add(self.register_x); // adds what's in X to it
                 let lo = self.mem_read(ptr as u16); // reads what's at the pointer
                 let hi = self.mem_read(ptr.wrapping_add(1) as u16); // and then at pointer + 1
-                u16::from_le_bytes([lo,hi]) // converts to full memory address $hilo
+                (u16::from_le_bytes([lo,hi]), false) // converts to full memory address $hilo
+
+                // A page cross is theoretically possible (See indirect_Y) but none of our opcodes lead to it.
             }
             AddressingMode::Indirect_Y => {
                 // Gets a 0-page memory address
@@ -153,7 +160,7 @@ impl CPU {
                 let hi = self.mem_read((base as u8).wrapping_add(1) as u16); // reads whats at pointer + 1
                 let deref_base = u16::from_le_bytes([lo,hi]); // combines into full address, dereferncing base
                 let deref = deref_base.wrapping_add(self.register_y as u16); // adds whats's in Y to deref-ed address.
-                deref
+                (deref, page_cross(deref, deref_base))
             }
 
             _ => {
@@ -162,9 +169,9 @@ impl CPU {
         }
     }
 
-    fn get_operand_address(&mut self, mode: &AddressingMode) -> u16 {
+    fn get_operand_address(&mut self, mode: &AddressingMode) -> (u16, bool) {
         match mode {
-            AddressingMode::Immediate => self.program_counter,
+            AddressingMode::Immediate => (self.program_counter, false),
             // gives whatever hex value is in the instruction as the value to be used.
 
             _ => self.get_absolute_address(mode, self.program_counter),
@@ -192,27 +199,39 @@ impl CPU {
     }
 
     fn lda(&mut self, mode: &AddressingMode) {
-        let addr = self.get_operand_address(mode);
+        let (addr, page_cross) = self.get_operand_address(mode);
         let value = self.mem_read(addr);
        
         self.register_a = value;
         self.update_zero_and_negative_flags(self.register_a);
+
+        if page_cross {
+            self.bus.tick(1);
+        }
     }
 
     fn ldx(&mut self, mode: &AddressingMode) {
-        let addr = self.get_operand_address(mode);
+        let (addr, page_cross) = self.get_operand_address(mode);
         let value = self.mem_read(addr);
        
         self.register_x = value;
         self.update_zero_and_negative_flags(self.register_x);
+
+        if page_cross {
+            self.bus.tick(1);
+        }
     }
 
     fn ldy(&mut self, mode: &AddressingMode) {
-        let addr = self.get_operand_address(mode);
+        let (addr, page_cross) = self.get_operand_address(mode);
         let value = self.mem_read(addr);
        
         self.register_y = value;
         self.update_zero_and_negative_flags(self.register_y);
+
+        if page_cross {
+            self.bus.tick(1);
+        }
     }
   
     fn tax(&mut self) {
@@ -245,7 +264,7 @@ impl CPU {
     }
 
     fn inc(&mut self, mode: &AddressingMode) {
-        let addr = self.get_operand_address(mode);
+        let (addr, _) = self.get_operand_address(mode);
         let mut value = self.mem_read(addr);
 
         if value == 0xff { 
@@ -260,7 +279,7 @@ impl CPU {
     }
 
     fn dec(&mut self, mode: &AddressingMode) {
-        let addr = self.get_operand_address(mode);
+        let (addr, _) = self.get_operand_address(mode);
         let mut value = self.mem_read(addr);
 
         if value == 0 { 
@@ -314,46 +333,58 @@ impl CPU {
     }
 
     fn sta(&mut self, mode: &AddressingMode) {
-        let addr = self.get_operand_address(mode);
+        let (addr, _) = self.get_operand_address(mode);
         self.mem_write(addr, self.register_a);
     }
 
     fn stx(&mut self, mode: &AddressingMode) {
-        let addr = self.get_operand_address(mode);
+        let (addr, _) = self.get_operand_address(mode);
         self.mem_write(addr, self.register_x);
     }
 
     fn sty(&mut self, mode: &AddressingMode) {
-        let addr = self.get_operand_address(mode);
+        let (addr, _) = self.get_operand_address(mode);
         self.mem_write(addr, self.register_y);
     }
 
     fn and(&mut self, mode: &AddressingMode) {
-        let addr = self.get_operand_address(mode);
+        let (addr, page_cross) = self.get_operand_address(mode);
         let value = self.mem_read(addr);
 
         self.register_a = self.register_a & value;
         self.update_zero_and_negative_flags(self.register_a);
+
+        if page_cross {
+            self.bus.tick(1);
+        }
     }
 
     fn ora(&mut self, mode: &AddressingMode) {
-        let addr = self.get_operand_address(mode);
+        let (addr, page_cross) = self.get_operand_address(mode);
         let value = self.mem_read(addr);
 
         self.register_a = self.register_a | value;
         self.update_zero_and_negative_flags(self.register_a);
+
+        if page_cross {
+            self.bus.tick(1);
+        }
     }
 
     fn eor(&mut self, mode: &AddressingMode) {
-        let addr = self.get_operand_address(mode);
+        let (addr, page_cross) = self.get_operand_address(mode);
         let value = self.mem_read(addr);
 
         self.register_a = self.register_a ^ value;
         self.update_zero_and_negative_flags(self.register_a);
+
+        if page_cross {
+            self.bus.tick(1);
+        }
     }
 
     fn cmp(&mut self, mode: &AddressingMode) {
-        let addr = self.get_operand_address(mode);
+        let (addr, page_cross) = self.get_operand_address(mode);
         let value = self.mem_read(addr);
 
         let check = self.register_a.wrapping_sub(value);
@@ -364,10 +395,14 @@ impl CPU {
             self.clc()
         }
         self.update_zero_and_negative_flags(check);
+
+        if page_cross {
+            self.bus.tick(1);
+        }
     }
 
     fn cpx(&mut self, mode: &AddressingMode) {
-        let addr = self.get_operand_address(mode);
+        let (addr, page_cross) = self.get_operand_address(mode);
         let value = self.mem_read(addr);
 
         let check = self.register_x.wrapping_sub(value);
@@ -378,10 +413,14 @@ impl CPU {
             self.clc()
         }
         self.update_zero_and_negative_flags(check);
+
+        if page_cross {
+            self.bus.tick(1);
+        }
     }
 
     fn cpy(&mut self, mode: &AddressingMode) {
-        let addr = self.get_operand_address(mode);
+        let (addr, page_cross) = self.get_operand_address(mode);
         let value = self.mem_read(addr);
 
         let check = self.register_y.wrapping_sub(value);
@@ -392,6 +431,10 @@ impl CPU {
             self.clc()
         }
         self.update_zero_and_negative_flags(check);
+
+        if page_cross {
+            self.bus.tick(1);
+        }
     }
 
     fn asl(&mut self, mode: &AddressingMode) {
@@ -409,7 +452,7 @@ impl CPU {
             self.update_zero_and_negative_flags(self.register_a);
 
         } else {
-            let addr = self.get_operand_address(mode);
+            let (addr, _) = self.get_operand_address(mode);
             let mut value = self.mem_read(addr);
             if value & 0b1000_0000 != 0 { // if 7th (last) bit of register is set, checked w/ bitwise AND
                 self.sec(); 
@@ -445,7 +488,7 @@ impl CPU {
             self.update_zero_and_negative_flags(self.register_a);
 
         } else {
-            let addr = self.get_operand_address(mode);
+            let (addr, _) = self.get_operand_address(mode);
             let mut value = self.mem_read(addr);
             if value & 0b1000_0000 != 0 { // if 7th (last) bit of register is set, checked w/ bitwise AND
                 self.sec(); 
@@ -479,7 +522,7 @@ impl CPU {
             self.update_zero_and_negative_flags(self.register_a);
 
         } else {
-            let addr = self.get_operand_address(mode);
+            let (addr, _) = self.get_operand_address(mode);
             let mut value = self.mem_read(addr);
             if value & 0b0000_0001 != 0 { // if bit 0 of register is set, checked w/ bitwise AND
                 self.sec(); 
@@ -522,7 +565,7 @@ impl CPU {
 
         } else {
 
-            let addr = self.get_operand_address(mode);
+            let (addr, _) = self.get_operand_address(mode);
             let mut value = self.mem_read(addr);
             if value & 0b0000_0001 != 0 { // if 7th (last) bit of register is set, checked w/ bitwise AND
                 self.sec(); 
@@ -579,7 +622,7 @@ impl CPU {
     }
 
     fn bit(&mut self, mode: &AddressingMode) {
-        let addr = self.get_operand_address(mode);
+        let (addr, _) = self.get_operand_address(mode);
         let value = self.mem_read(addr);
 
         if (self.register_a & value) == 0 { // if register = 0
@@ -614,9 +657,12 @@ impl CPU {
 
     fn bne(&mut self) {
         if self.status & 0b0000_0010 == 0b0000_0000 {
+            self.bus.tick(1);
+
             let value = self.mem_read(self.program_counter);
 
             let shift = value as i8;
+            let old_pc = self.program_counter;
 
             if shift >= 0 {
                 self.program_counter = self.program_counter + 1 + (shift as u16);
@@ -626,14 +672,22 @@ impl CPU {
                 // shift back, and the way this is implemented by the datatypes (because of 2's complement),
                 // counter gets automatically shifted correctly.
             }
+
+            if page_cross(old_pc, self.program_counter) {
+                self.bus.tick(1);
+            }
+
         }
     }
 
     fn beq(&mut self) {
         if self.status & 0b0000_0010 == 0b0000_0010 {
+            self.bus.tick(1);
+
             let value = self.mem_read(self.program_counter);
 
             let shift = value as i8;
+            let old_pc = self.program_counter;
 
             if shift >= 0 {
                 self.program_counter = self.program_counter + 1 + (shift as u16);
@@ -642,15 +696,22 @@ impl CPU {
                 self.program_counter = self.program_counter - (0xffff - shift as u16);
                 // shift back, and the way this is implemented by the datatypes (because of 2's complement),
                 // counter gets automatically shifted correctly.
+            }
+
+            if page_cross(old_pc, self.program_counter) {
+                self.bus.tick(1);
             }
         }
     }
 
     fn bcc(&mut self) {
         if self.status & 0b0000_0001 == 0b0000_0000 {
+            self.bus.tick(1);
+
             let value = self.mem_read(self.program_counter);
 
             let shift = value as i8;
+            let old_pc = self.program_counter;
 
             if shift >= 0 {
                 self.program_counter = self.program_counter + 1 + (shift as u16);
@@ -659,15 +720,22 @@ impl CPU {
                 self.program_counter = self.program_counter - (0xffff - shift as u16);
                 // shift back, and the way this is implemented by the datatypes (because of 2's complement),
                 // counter gets automatically shifted correctly.
+            }
+
+            if page_cross(old_pc, self.program_counter) {
+                self.bus.tick(1);
             }
         }
     }
 
     fn bcs(&mut self) {
         if self.status & 0b0000_0001 == 0b0000_0001 {
+            self.bus.tick(1);
+
             let value = self.mem_read(self.program_counter);
 
             let shift = value as i8;
+            let old_pc = self.program_counter;
 
             if shift >= 0 {
                 self.program_counter = self.program_counter + 1 + (shift as u16);
@@ -676,15 +744,22 @@ impl CPU {
                 self.program_counter = self.program_counter - (0xffff - shift as u16);
                 // shift back, and the way this is implemented by the datatypes (because of 2's complement),
                 // counter gets automatically shifted correctly.
+            }
+
+            if page_cross(old_pc, self.program_counter) {
+                self.bus.tick(1);
             }
         }
     }
 
     fn bmi(&mut self) {
         if self.status & 0b1000_0000 == 0b1000_0000 {
+            self.bus.tick(1);
+
             let value = self.mem_read(self.program_counter);
 
             let shift = value as i8;
+            let old_pc = self.program_counter;
 
             if shift >= 0 {
                 self.program_counter = self.program_counter + 1 + (shift as u16);
@@ -693,15 +768,22 @@ impl CPU {
                 self.program_counter = self.program_counter - (0xffff - shift as u16);
                 // shift back, and the way this is implemented by the datatypes (because of 2's complement),
                 // counter gets automatically shifted correctly.
+            }
+
+            if page_cross(old_pc, self.program_counter) {
+                self.bus.tick(1);
             }
         }
     }
 
     fn bpl(&mut self) {
         if self.status & 0b1000_0000 == 0b0000_0000 {
+            self.bus.tick(1);
+            
             let value = self.mem_read(self.program_counter);
 
             let shift = value as i8;
+            let old_pc = self.program_counter;
 
             if shift >= 0 {
                 self.program_counter = self.program_counter + 1 + (shift as u16);
@@ -710,15 +792,21 @@ impl CPU {
                 self.program_counter = self.program_counter - (0xffff - shift as u16);
                 // shift back, and the way this is implemented by the datatypes (because of 2's complement),
                 // counter gets automatically shifted correctly.
+            }
+
+            if page_cross(old_pc, self.program_counter) {
+                self.bus.tick(1);
             }
         }
     }
 
     fn bvc(&mut self) {
         if self.status & 0b0100_0000 == 0b0000_0000 {
+            self.bus.tick(1);
             let value = self.mem_read(self.program_counter);
 
             let shift = value as i8;
+            let old_pc = self.program_counter;
 
             if shift >= 0 {
                 self.program_counter = self.program_counter + 1 + (shift as u16);
@@ -728,14 +816,20 @@ impl CPU {
                 // shift back, and the way this is implemented by the datatypes (because of 2's complement),
                 // counter gets automatically shifted correctly.
             }
+
+            if page_cross(old_pc, self.program_counter) {
+                self.bus.tick(1);
+            }
         }
     }
 
     fn bvs(&mut self) {
         if self.status & 0b0100_0000 == 0b0100_0000 {
+            self.bus.tick(1);
             let value = self.mem_read(self.program_counter);
 
             let shift = value as i8;
+            let old_pc = self.program_counter;
 
             if shift >= 0 {
                 self.program_counter = self.program_counter + 1 + (shift as u16);
@@ -744,6 +838,10 @@ impl CPU {
                 self.program_counter = self.program_counter - (0xffff - shift as u16);
                 // shift back, and the way this is implemented by the datatypes (because of 2's complement),
                 // counter gets automatically shifted correctly.
+            }
+
+            if page_cross(old_pc, self.program_counter) {
+                self.bus.tick(1);
             }
         }
     }
@@ -769,7 +867,7 @@ impl CPU {
                     self.program_counter = indirect_ref;
         }
         else {
-            let addr = self.get_operand_address(mode);
+            let (addr, _) = self.get_operand_address(mode);
             self.program_counter = addr;
         }
     }
@@ -832,7 +930,7 @@ impl CPU {
         self.mem_write(stack_addr, lo);
         self.stack_pointer -= 1;
 
-        let addr = self.get_operand_address(mode);
+        let (addr, _) = self.get_operand_address(mode);
         self.program_counter = addr;
     }
 
@@ -900,21 +998,29 @@ impl CPU {
     }
 
     fn adc(&mut self, mode: &AddressingMode) {
-        let addr = self.get_operand_address(mode);
+        let (addr, page_cross) = self.get_operand_address(mode);
         let value = self.mem_read(addr);
         self.plus_minus(value);
+
+        if page_cross {
+            self.bus.tick(1);
+        }
     }
 
     fn sbc(&mut self, mode: &AddressingMode) {
-        let addr = self.get_operand_address(mode);
+        let (addr, page_cross) = self.get_operand_address(mode);
         let mut value = self.mem_read(addr);
 
         value = !value; // 1's complement 
         self.plus_minus(value); // X - Y ==  X + -Y, and -Y == !Y  in signed complements.
+
+        if page_cross {
+            self.bus.tick(1);
+        }
     }
 
     fn dcp(&mut self, mode: &AddressingMode) {
-        let addr = self.get_operand_address(mode);
+        let (addr, _) = self.get_operand_address(mode);
         let mut value = self.mem_read(addr);
 
         value = value.wrapping_sub(1);
@@ -944,7 +1050,7 @@ impl CPU {
     }
 
     fn axs(&mut self, mode: &AddressingMode) {
-        let addr = self.get_operand_address(mode);
+        let (addr, _) = self.get_operand_address(mode);
         let value = self.mem_read(addr);
 
         if value <=  (self.register_a & self.register_x){
@@ -1014,7 +1120,7 @@ impl CPU {
     }
 
     fn sax(&mut self, mode: &AddressingMode) {
-        let addr = self.get_operand_address(mode);
+        let (addr, _) = self.get_operand_address(mode);
         let data = self.register_a & self.register_x;
 
         self.mem_write(addr, data);
@@ -1237,7 +1343,7 @@ impl CPU {
                 // Other NOPs which read memory
                 0x04 | 0x44 | 0x64 | 0x14 | 0x34 | 0x54 | 0x74 | 0xd4 | 0xf4 | 0x0c | 0x1c
                 | 0x3c | 0x5c | 0x7c | 0xdc | 0xfc | 0x80 | 0x82 | 0x89 | 0xc2 | 0xe2 => {
-                    let addr = self.get_operand_address(&opcode.mode);
+                    let (addr, _) = self.get_operand_address(&opcode.mode);
                     #[allow(unused_variables)]
                     let data = self.mem_read(addr);
                 }
@@ -1298,7 +1404,11 @@ impl CPU {
                 _ => todo!(),
             }
 
-            if program_counter_state == self.program_counter { // [?] Why would this ever be false?
+            self.bus.tick(opcode.cycles);
+
+            if program_counter_state == self.program_counter { 
+                // [-] Why would this ever be false?
+                // [A] Because of CPU and PPU cycles!
                 self.program_counter += (opcode.len - 1) as u16;
                 // Steps to increase program counter by = bytes processed by opcode - 1
                 // -1, because first increase caused by opcode matching is already accounted for. 

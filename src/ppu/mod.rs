@@ -28,6 +28,9 @@ pub struct NesPPU {
     pub scroll: ScrollRegister,
     pub status: StatusRegister,
 
+    scanline: u16,
+    cycles: usize,
+
 }
 
 impl NesPPU {
@@ -54,13 +57,38 @@ impl NesPPU {
             oam_addr: 0,
             scroll: ScrollRegister::new(),
             status: StatusRegister::new(),
+
+            scanline:0,
+            cycles:0,
         }
+    }
+
+    pub fn tick(&mut self, cycles: u8) -> bool {
+        self.cycles += cycles as usize;
+        if self.cycles >= 341 {
+            self.cycles = self.cycles - 341;
+            self.scanline += 1;
+ 
+            if self.scanline == 241 {
+                if self.ctrl.generate_vblank_nmi() {
+                    self.status.set_vblank_status(true);
+                    todo!("Should trigger NMI interrupt")
+                }
+            }
+ 
+            if self.scanline >= 262 {
+                self.scanline = 0;
+                self.status.reset_vblank_status();
+                return true;
+            }
+        }
+        return false;
     }
 
     // For some reasoning
     // https://chatgpt.com/g/g-GbLbctpPz-universal-primer/c/672da542-9748-8002-94b8-817c14f362dd
-    // and this video:
-    // https://www.youtube.com/watch?v=7Co_8dC2zb8
+    // and these videos:
+    // https://www.youtube.com/watch?v=7Co_8dC2zb8 , https://www.youtube.com/watch?v=3uzcN9PHZZs
 
     // Mirroring screens
 
