@@ -121,7 +121,7 @@ fn main() {
     let video_subsystem = sdl_context.video().unwrap();
     let window = video_subsystem
         .window(
-            "runesco: Tile Viewer",
+            "runesco: Tileset",
             (256.0 * 3.0) as u32,
             (240.0 * 3.0) as u32,
         )
@@ -153,7 +153,7 @@ fn main() {
     let rom_len = rom.chr_rom.len();
     println!("Rom length is: {rom_len}");
 
-    let bank = show_tile_bank(&rom.chr_rom, 0);
+    let bank = show_tile_bank(&rom.chr_rom, 1);
 
 
     texture.update(None, &bank.data, 256 * 3).unwrap();
