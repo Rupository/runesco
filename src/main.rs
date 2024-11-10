@@ -7,13 +7,14 @@ pub mod trace;
 pub mod ppu;
 pub mod render;
 
-//use bus::Bus;
+use bus::Bus;
 //use cpu::Mem;
-//use cpu::CPU;
+use cpu::CPU;
 //use rand::Rng;
 use cartridge::Rom;
 use render::frame::Frame;
 use render::palette;
+use crate::ppu::NesPPU;
 //use trace::trace;
 
 use sdl2::event::Event;
@@ -75,6 +76,7 @@ fn show_tile(chr_rom: &Vec<u8>, bank: usize, tile_n: usize) -> Frame {
     frame
 }
 
+#[allow(dead_code)]
 fn show_tile_bank(chr_rom: &Vec<u8>, bank: usize) ->Frame {
     assert!(bank <= 1);
 
@@ -125,14 +127,13 @@ fn main() {
             (256.0 * 3.0) as u32,
             (240.0 * 3.0) as u32,
         )
-        // 32x32 screen, scaled by a factor of 20.
+        // 256 x 240 screen, scaled by a factor of 3 ([?] for RGB)
         .position_centered()
         .build()
         .unwrap();
 
     // A 'canvas': something which can be 'drawn' on is put over the window
     let mut canvas = window.into_canvas().present_vsync().build().unwrap();
-    #[allow(unused_variables, unused_mut)]
     let mut event_pump = sdl_context.event_pump().unwrap();
     canvas.set_scale(10.0, 10.0).unwrap();
 
@@ -150,51 +151,39 @@ fn main() {
     let nes_file_data: Vec<u8> = std::fs::read("pacman.nes").unwrap();
     let rom = Rom::new(&nes_file_data).unwrap();
 
-    let rom_len = rom.chr_rom.len();
-    println!("Rom length is: {rom_len}");
+    let mut frame = Frame::new();
 
-    let bank = show_tile_bank(&rom.chr_rom, 1);
+    //let bank = show_tile_bank(&rom.chr_rom, 1);
 
-
-    texture.update(None, &bank.data, 256 * 3).unwrap();
-    canvas.copy(&texture, None, None).unwrap();
-    canvas.present();
-
-    loop {
-        for event in event_pump.poll_iter() {
-            match event {
-                Event::Quit { .. } | Event::KeyDown {
-                    keycode: Some(Keycode::Escape),
-                    ..
-                } => std::process::exit(0),
-                _ => { /* do nothing */ }
-            }
-        }
-    }
-
-    //let bus = Bus::new(rom);
-    //let mut cpu = CPU::new(bus);
-    //cpu.reset();
-    //cpu.program_counter = 0xC000;
-
-    // let mut screen_state = [0 as u8; 32 * 3 * 32]; // initialise the screen state array
-    // let mut rng = rand::thread_rng();
-
-    // run the game cycle
-    //cpu.run_with_callback(move |cpu| {
-    //println!("{}", trace(cpu));
-    // CPU is moved (explicitly borrowed) so that nothing outside the gameloop
-    // can change the CPU state.
-
-    // handle_user_input(cpu, &mut event_pump);
-    // cpu.mem_write(0xfe, rng.gen_range(1, 16));
-
-    //if read_screen_state(cpu, &mut screen_state) { // update the screen if it needs to be updated
-    //texture.update(None, &screen_state, 32 * 3).unwrap();
+    //texture.update(None, &bank.data, 256 * 3).unwrap();
     //canvas.copy(&texture, None, None).unwrap();
     //canvas.present();
-    //}
 
-    //::std::thread::sleep(Duration::new(0, 10_000)); // slows down pace for playability
-    //});
+   // the game cycle
+   let bus = Bus::new(rom, move |ppu: &NesPPU| {
+       render::render(ppu, &mut frame);
+       // renders the current data from PPU and draws the current frame
+
+       texture.update(None, &frame.data, 256 * 3).unwrap();
+       // sdl updates pixels accordingly
+
+       canvas.copy(&texture, None, None).unwrap();
+
+       canvas.present();
+
+       for event in event_pump.poll_iter() {
+           match event {
+             Event::Quit { .. } | Event::KeyDown {
+                 keycode: Some(Keycode::Escape),
+                 ..
+             } => std::process::exit(0),
+             _ => { /* do nothing */ }
+           }
+        }
+   });
+
+   let mut cpu = CPU::new(bus);
+
+   cpu.reset();
+   cpu.run();
 }

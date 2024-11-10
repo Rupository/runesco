@@ -9,16 +9,41 @@ const PPU_REGISTERS_MIRRORS_END: u16 = 0x3FFF;
 const PRG: u16 = 0x8000;
 const PRG_END: u16 = 0xFFFF;
 
-pub struct Bus {
+pub struct Bus<'call> {
+    // <'call> is a lifetime parameter for the Bus struct. It indicates that some part of the Bus struct 
+    // (specifically the gameloop_callback field) contains a reference 
+    // (or borrowed data) that must live as long as 'call.
+
     cpu_vram: [u8; 2048], // 2KiB of Ram, from 0x0000 to 0x2000 (with higest two bits 0-ed)
     prg_rom: Vec<u8>,
     ppu: NesPPU,
     cycles: usize,
+
+    gameloop_callback: Box<dyn FnMut(&NesPPU) + 'call>,
+
+    // Boxes: allow for data storage to the heap. Helpful when size is unknown (like in recursion!)
+    // See: https://doc.rust-lang.org/book/ch15-01-box.html
+
+    // dyn: By default, Rust uses static dispatch, which means that when you call a method on a type, 
+    // the exact method implementation is determined at compile time. However, sometimes you want to call 
+    // methods on types that might change at runtime, such as function traits (Fn, FnMut, etc.). This is
+    // the purpose dyn serves: dynamic dispatch.
+
+    // The + 'call part after FnMut(&NesPPU) specifies that the data required by this function 
+    // (or any references it uses) will live as long as 'call, tying it to the 'call lifetime parameter.
+
+    // Why Box<dyn FnMut(...)> instead of a plain function pointer?
+    // Using dyn FnMut (a trait object) allows us to pass any closure or function that matches the 
+    // signature FnMut(&NesPPU) without knowing its exact type. 
+    // 
+    // The Box makes it a heap-allocated, fixed-size pointer, which is necessary because dyn trait 
+    // objects don’t have a known size at compile time, but pointers do!
 }
 
-impl Bus {
-    pub fn new(rom: Rom) -> Self {
-
+impl<'a> Bus<'a> { // can be any lifetime 'a
+    pub fn new<'call, F>(rom: Rom, gameloop_callback: F) -> Bus<'call>
+    where F: FnMut(&NesPPU) + 'call,
+    {
         let ppu = NesPPU::new(rom.chr_rom, rom.screen_mirroring);
 
         Bus {
@@ -26,12 +51,20 @@ impl Bus {
             prg_rom: rom.prg_rom,
             ppu: ppu,
             cycles: 0,
+            gameloop_callback: Box::from(gameloop_callback),
         }
     }
 
     pub fn tick(&mut self, cycles: u8) {
         self.cycles += cycles as usize;
-        self.ppu.tick(cycles * 3);
+        let new_frame = self.ppu.tick(cycles * 3);
+        if new_frame {
+            (self.gameloop_callback)(&self.ppu);
+            // use the gameloop callback closure and pass a reference PPU to it
+
+            // This is the state of the PPU after a screen is rendered (post NMI)
+            // after which the data in it is used to render the frame.
+        }
     }
 
     pub fn poll_nmi_status(&mut self) -> Option<u8> {
@@ -50,7 +83,7 @@ impl Bus {
     }
 }
 
-impl Mem for Bus {
+impl Mem for Bus<'_> {
     fn mem_read(&mut self, addr: u16) -> u8 {
         match addr {
             RAM..=RAM_MIRRORS_END => {

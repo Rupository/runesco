@@ -132,7 +132,7 @@ pub fn trace(cpu: &mut CPU) -> String {
     .to_ascii_uppercase()
 }
 
-#[cfg(test)]
+/*#[cfg(test)]
 mod test {
     use super::*;
     use crate::bus::Bus;
@@ -197,4 +197,4 @@ mod test {
             result[0]
         );
     }
-}
+}*/

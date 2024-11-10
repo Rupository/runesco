@@ -65,7 +65,7 @@ impl NesPPU {
         }
     }
 
-    pub fn tick(&mut self, cycles: u8) -> bool {
+    pub fn tick(&mut self, cycles: u8) -> bool { // returns true on NMI, for use case see Bus.
         self.cycles += cycles as usize;
         if self.cycles >= 341 {
             self.cycles = self.cycles - 341;

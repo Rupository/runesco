@@ -2,14 +2,14 @@ use std::collections::HashMap;
 use crate::{bus::Bus, opcodes};
 
 
-pub struct CPU { // CPU with..  
+pub struct CPU<'a> { // CPU with..  
     pub register_a: u8, // Accumulator A
     pub register_x: u8, // Register X
     pub register_y: u8, // Register Y
     pub stack_pointer: u8, // Stack Pointer
     pub status: u8, // Status flags [NV_BDIZC]
     pub program_counter: u16, // Program Counter
-    pub bus: Bus, // ...and 64 Kilobits of total memory space
+    pub bus: Bus<'a>, // ...and 64 Kilobits of total memory space
 }
 
 #[derive(Debug)]
@@ -50,7 +50,7 @@ pub trait Mem {
     }
 }
 
-impl Mem for CPU {
+impl Mem for CPU<'_> {
     fn mem_read(&mut self, addr: u16) -> u8 {
         self.bus.mem_read(addr)
     }
@@ -96,9 +96,21 @@ mod interrupt {
     };
 }
 
-impl CPU {
+impl<'a> CPU<'a> {
     
-    pub fn new(bus: Bus) -> Self {
+    pub fn new<'b>(bus: Bus<'b>) -> CPU<'b> {
+
+        // Lifetimes in CPU Initialization
+        // There are two lifetime annotations here: 'a and 'b.
+
+        // - 'a: This is a lifetime parameter for the CPU struct itself. It indicates that the CPU struct contains
+        //  references that must be valid for the lifetime 'a.
+        // - 'b: This is a lifetime parameter for the new function itself. It allows new to accept a Bus reference 
+        // with a potentially different lifetime 'b and then return a CPU instance with a lifetime tied to 'b.
+
+        // The purpose of using these lifetimes is to make sure that the CPU struct can borrow the Bus struct for 
+        // as long as the Bus struct itself is valid, avoiding any invalid references.
+        
         CPU {
             register_a: 0,
             register_x: 0,
@@ -1186,33 +1198,18 @@ impl CPU {
         // from its environment (that is, rust intelligently infers the type it will be operating with without needing to be told explicitly)
     }
 
-    // The above is an empty version of run_with_callback() which has been defined below. This pertains to tests
-    // and functionality which does not require updating instructions during the program run, as one would
-    // when handling user input.
+    // The run_with_callback method is the actual workhorse function that drives the CPU simulation. 
+    // This function accepts a callback parameter, F, which is a closure or function that takes a &mut CPU as an argument.
 
-    // Before proceeding to the next function definition, it would be useful to know what a callback does:
+    // Callback Parameter (F: FnMut(&mut CPU))
+    // The callback function F must implement the FnMut(&mut CPU) trait. This means:
+    // - The callback function will accept a mutable reference to the CPU object.
+    // - The callback can modify the CPU each time it’s called.
+    // - The FnMut trait means that this function might change its state between calls, making it suitable for 
+    // callbacks that track or modify something over time (e.g., tracking CPU cycles or responding to specific CPU states).
 
-    // < "Everybody has bought food over a counter. At McDonalds, I tell someone "I want a Big Mac", establish my credentials by 
-    // giving them money, then move aside while I wait for my food. When my food is ready, I am called, and receive what I asked for.
-
-    // Everybody has taken money from an ATM. I assert that I want some money, I establish my credentials with a PIN, wait, 
-    // and (usually) get that amount of money.
-
-    // The key difference between those two scenarios is that in the first the next customer can be served while 
-    // I wait for my food. In the second, those who want to use the ATM must wait until I'm done."
-
-    // - Sandro Pascal, Quora >
-
-    // A callback is like ordering at the McDonalds. Other instructions can be processed while your request has been queued. 
-
-    // In the case of our gameloop, we would want the game to keep updating (the snake to keep moving in some direction)
-    // while waiting for user input to change that direction if needed. 
-
-    // Thus, analogously, after inputting some direction (placing an order), the snake keeps moving (other orders are taken),
-    // your new snake direction is processed (your order is completed), and the snake keeps moving (other orders are taken) 
-    // again until you add another input (place a new order).
-
-
+    // This is used for recursion. This also comes in handy when rendering the screen using the PPU 
+    // and passing the callback to the Bus, which changes the CPU state.
 
     pub fn run_with_callback<F>(&mut self, mut callback: F) // F is a generic type... 
     where F: FnMut(&mut CPU), // such that F is a mutable closure which does not move captured values out of their body, 
