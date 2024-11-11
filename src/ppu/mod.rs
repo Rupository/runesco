@@ -46,7 +46,7 @@ impl NesPPU {
         NesPPU {
             chr_rom: chr_rom,
             mirroring: mirroring,
-            vram: [0; 2048],
+            vram: [0; 2048], // VIDEO RAM
             oam_data: [0; 64 * 4],
             palette_table: [0; 32],
 
