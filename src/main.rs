@@ -123,7 +123,7 @@ fn main() {
     let video_subsystem = sdl_context.video().unwrap();
     let window = video_subsystem
         .window(
-            "runesco: Tileset",
+            "runesco: PAC-MAN (iNES)",
             (256.0 * 3.0) as u32,
             (240.0 * 3.0) as u32,
         )
