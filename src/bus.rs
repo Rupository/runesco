@@ -147,6 +147,7 @@ impl Mem for Bus<'_> {
             }
 
             0x2004 => {
+                println!("Writing to OAM data");
                 self.ppu.write_to_oam_data(data);
             }
             0x2005 => {
@@ -165,8 +166,46 @@ impl Mem for Bus<'_> {
                 self.mem_write(mirror_down_addr, data);
             }
 
-            0x4000..=0x4015 => {
+            0x4000..=0x4013 | 0x4015 => {
                 //ignore APU 
+            }
+
+            0x4014 => { 
+                // OAM sprite write operations happen
+                // in a single go using this!
+
+                // Transfers 256 bytes from CPU memory at once.
+                let mut buffer: [u8; 256] = [0; 256];
+                let hi: u16 = (data as u16) << 8;
+                // data is 0x02, then hi = data << 8 <u16> gives 0x0200 as the starting address.
+                // If data is 0x03, then the starting address is 0x0300, and so on.
+
+                // This tells us the starting index of the page to be read to draw sprites
+
+                // This formatting is necessary for the reading the subsequent 256
+                // bytes of data directly, insted of passing them one by one (0x0201, 0x0202, ... )
+                for i in 0..256u16 {
+                    buffer[i as usize] = self.mem_read(hi + i);
+                }
+
+                // NOTE (^):
+                // The memory page selected for the 0x4014 DMA transfer will contain the intended sprite 
+                // data because the game or program running on the NES is responsible for placing sprite 
+                //data in that specific page before triggering the transfer.
+
+                // Init: Before calling the 0x4014 DMA write, the game code will typically load the 256 bytes of 
+                // sprite data (e.g., positions, tile indices, colors) into a designated memory page in the 
+                // CPU’s RAM (see: const RAM above). This data layout follows the PPU’s OAM format so that the
+                // sprite attributes are ready to be copied as-is to the PPU.
+
+                // Maintanance: Games usually follow a predictable layout for memory, especially for sprites. 
+                // For instance, many games will designate a specific page, such as 0x0200 to 0x02FF, 
+                // exclusively for sprite data, and the game engine will write sprite attributes to this page 
+                // each frame as they update.
+
+                // So, this read operation makes sense.
+
+                self.ppu.write_oam_dma(&buffer);
             }
 
             0x4016 => {

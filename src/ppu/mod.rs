@@ -82,7 +82,7 @@ impl NesPPU {
             if self.scanline >= 262 {
                 self.scanline = 0;
                 self.nmi_interrupt = None;
-                self.status.set_sprite_zero_hit(false); // redundant?
+                self.status.set_sprite_zero_hit(false); // [?] redundant
                 self.status.reset_vblank_status();
                 return true;
             }
@@ -163,6 +163,7 @@ impl NesPPU {
     }
 
     pub fn write_to_oam_data(&mut self, value: u8) {
+        println!("recieved write");
         self.oam_data[self.oam_addr as usize] = value;
         self.oam_addr = self.oam_addr.wrapping_add(1);
     }

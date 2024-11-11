@@ -9,7 +9,7 @@ pub struct CPU<'a> { // CPU with..
     pub stack_pointer: u8, // Stack Pointer
     pub status: u8, // Status flags [NV_BDIZC]
     pub program_counter: u16, // Program Counter
-    pub bus: Bus<'a>, // ...and 64 Kilobits of total memory space
+    pub bus: Bus<'a>,
 }
 
 #[derive(Debug)]
@@ -110,7 +110,7 @@ impl<'a> CPU<'a> {
 
         // The purpose of using these lifetimes is to make sure that the CPU struct can borrow the Bus struct for 
         // as long as the Bus struct itself is valid, avoiding any invalid references.
-        
+
         CPU {
             register_a: 0,
             register_x: 0,
