@@ -125,6 +125,20 @@ fn main() {
     // init sdl2
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
+
+    let controller_subsystem = sdl_context.game_controller().unwrap();
+    let controller = (0..controller_subsystem.num_joysticks().unwrap())
+    .find_map(|i| {
+        if controller_subsystem.is_game_controller(i) {
+            Some(controller_subsystem.open(i).unwrap())
+        } else {
+            None
+        }
+    })
+    .expect("No compatible game controller found");
+
+    println!("Controller detected: {}", controller.name());
+    
     let window = video_subsystem
         .window(
             "runesco: PAC-MAN (iNES)",
@@ -152,7 +166,7 @@ fn main() {
     // We specify that the visuals are in the form of 256 x 240 pixel grid
 
     //load the game
-    let nes_file_data: Vec<u8> = std::fs::read("pacman.nes").unwrap();
+    let nes_file_data: Vec<u8> = std::fs::read("donkeykong.nes").unwrap();
     let rom = Rom::new(&nes_file_data).unwrap();
 
     let mut frame = Frame::new();

@@ -64,5 +64,6 @@ impl Joypad {
 
     pub fn set_button_pressed_status(&mut self, button: JoypadButton, pressed: bool) {
         self.button_status.set(button, pressed);
+        println!("Press")
     }
 }
