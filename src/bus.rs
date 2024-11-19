@@ -1,6 +1,7 @@
 use crate::cpu::Mem;
 use crate::cartridge::Rom;
 use crate::ppu::NesPPU;
+use crate::joypads::Joypad;
 
 const RAM: u16 = 0x0000;
 const RAM_MIRRORS_END: u16 = 0x1FFF;
@@ -19,7 +20,7 @@ pub struct Bus<'call> {
     ppu: NesPPU,
     cycles: usize,
 
-    gameloop_callback: Box<dyn FnMut(&NesPPU) + 'call>,
+    gameloop_callback: Box<dyn FnMut(&NesPPU, &mut Joypad, &mut Joypad) + 'call>,
 
     // Boxes: allow for data storage to the heap. Helpful when size is unknown (like in recursion!)
     // See: https://doc.rust-lang.org/book/ch15-01-box.html
@@ -38,11 +39,14 @@ pub struct Bus<'call> {
     // 
     // The Box makes it a heap-allocated, fixed-size pointer, which is necessary because dyn trait 
     // objects don’t have a known size at compile time, but pointers do!
+
+    joypad1: Joypad,
+    joypad2: Joypad,
 }
 
 impl<'a> Bus<'a> { // can be any lifetime 'a
     pub fn new<'call, F>(rom: Rom, gameloop_callback: F) -> Bus<'call>
-    where F: FnMut(&NesPPU) + 'call,
+    where F: FnMut(&NesPPU, &mut Joypad, &mut Joypad) + 'call,
     {
         let ppu = NesPPU::new(rom.chr_rom, rom.screen_mirroring);
 
@@ -52,6 +56,8 @@ impl<'a> Bus<'a> { // can be any lifetime 'a
             ppu: ppu,
             cycles: 0,
             gameloop_callback: Box::from(gameloop_callback),
+            joypad1 : Joypad::new(),
+            joypad2 : Joypad::new(),
         }
     }
 
@@ -59,7 +65,7 @@ impl<'a> Bus<'a> { // can be any lifetime 'a
         self.cycles += cycles as usize;
         let new_frame = self.ppu.tick(cycles * 3);
         if new_frame {
-            (self.gameloop_callback)(&self.ppu);
+            (self.gameloop_callback)(&self.ppu, &mut self.joypad1, &mut self.joypad2);
             // use the gameloop callback closure and pass a reference PPU to it
 
             // This is the state of the PPU after a screen is rendered (post NMI)
@@ -111,13 +117,11 @@ impl Mem for Bus<'_> {
             }
 
             0x4016 => {
-                // ignore joypad 1;
-                0
+                self.joypad1.read()
             }
 
             0x4017 => {
-                // ignore joypad 2
-                0
+                self.joypad2.read()
             }
 
             PRG..=PRG_END => self.read_prg_rom(addr),
@@ -209,11 +213,11 @@ impl Mem for Bus<'_> {
             }
 
             0x4016 => {
-                // ignore joypad 1;
+                self.joypad1.write(data);
             }
 
             0x4017 => {
-                // ignore joypad 2
+                self.joypad2.write(data);
             }
 
             _ => {

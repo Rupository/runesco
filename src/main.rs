@@ -1,24 +1,28 @@
 pub mod bus;
 pub mod cartridge;
 pub mod cpu;
+pub mod joypads;
 pub mod opcodes;
 pub mod trace;
 
 pub mod ppu;
 pub mod render;
 
+use std::collections::HashMap;
+
 use bus::Bus;
 //use cpu::Mem;
 use cpu::CPU;
 //use rand::Rng;
+use crate::ppu::NesPPU;
 use cartridge::Rom;
 use render::frame::Frame;
 use render::palette;
-use crate::ppu::NesPPU;
 //use trace::trace;
 
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
+use sdl2::controller::Button;
 //use sdl2::pixels::Color;
 use sdl2::pixels::PixelFormatEnum;
 //use sdl2::EventPump;
@@ -77,7 +81,7 @@ fn show_tile(chr_rom: &Vec<u8>, bank: usize, tile_n: usize) -> Frame {
 }
 
 #[allow(dead_code)]
-fn show_tile_bank(chr_rom: &Vec<u8>, bank: usize) ->Frame {
+fn show_tile_bank(chr_rom: &Vec<u8>, bank: usize) -> Frame {
     assert!(bank <= 1);
 
     let mut frame = Frame::new();
@@ -86,7 +90,7 @@ fn show_tile_bank(chr_rom: &Vec<u8>, bank: usize) ->Frame {
     let bank = (bank * 0x1000) as usize;
 
     for tile_n in 0..255 {
-        if tile_n != 0 && tile_n % 20 == 0 { 
+        if tile_n != 0 && tile_n % 20 == 0 {
             // every time 20 tiles are drawn in a row,
             tile_y += 10; // move to next row
             tile_x = 0;
@@ -153,37 +157,83 @@ fn main() {
 
     let mut frame = Frame::new();
 
+    let mut p1 = HashMap::new();
+    p1.insert(Keycode::Down, joypads::JoypadButton::DOWN);
+    p1.insert(Keycode::Up, joypads::JoypadButton::UP);
+    p1.insert(Keycode::Right, joypads::JoypadButton::RIGHT);
+    p1.insert(Keycode::Left, joypads::JoypadButton::LEFT);
+    p1.insert(Keycode::RShift, joypads::JoypadButton::SELECT);
+    p1.insert(Keycode::Return, joypads::JoypadButton::START);
+    p1.insert(Keycode::Z, joypads::JoypadButton::BUTTON_A);
+    p1.insert(Keycode::X, joypads::JoypadButton::BUTTON_B);
+
+    let mut p2 = HashMap::new();
+    p2.insert(Button::DPadDown, joypads::JoypadButton::DOWN);
+    p2.insert(Button::DPadUp, joypads::JoypadButton::UP);
+    p2.insert(Button::DPadRight, joypads::JoypadButton::RIGHT);
+    p2.insert(Button::DPadLeft, joypads::JoypadButton::LEFT);
+    p2.insert(Button::Back, joypads::JoypadButton::SELECT);
+    p2.insert(Button::Start, joypads::JoypadButton::START);
+    p2.insert(Button::A, joypads::JoypadButton::BUTTON_A);
+    p2.insert(Button::B, joypads::JoypadButton::BUTTON_B);
+
     //let bank = show_tile_bank(&rom.chr_rom, 1);
 
     //texture.update(None, &bank.data, 256 * 3).unwrap();
     //canvas.copy(&texture, None, None).unwrap();
     //canvas.present();
 
-   // the game cycle
-   let bus = Bus::new(rom, move |ppu: &NesPPU| {
-       render::render(ppu, &mut frame);
-       // renders the current data from PPU and draws the current frame
+    // the game cycle
+    let bus = Bus::new(rom, move 
+        |ppu: &NesPPU, joypad1: &mut joypads::Joypad, joypad2: &mut joypads::Joypad| {
+        render::render(ppu, &mut frame);
+        // renders the current data from PPU and draws the current frame
 
-       texture.update(None, &frame.data, 256 * 3).unwrap();
-       // sdl updates pixels accordingly
+        texture.update(None, &frame.data, 256 * 3).unwrap();
+        // sdl updates pixels accordingly
 
-       canvas.copy(&texture, None, None).unwrap();
+        canvas.copy(&texture, None, None).unwrap();
 
-       canvas.present();
+        canvas.present();
 
-       for event in event_pump.poll_iter() {
-           match event {
-             Event::Quit { .. } | Event::KeyDown {
-                 keycode: Some(Keycode::Escape),
-                 ..
-             } => std::process::exit(0),
-             _ => { /* do nothing */ }
-           }
+        for event in event_pump.poll_iter() {
+            match event {
+                Event::Quit { .. }
+                | Event::KeyDown {
+                    keycode: Some(Keycode::Escape),
+                    ..
+                } => std::process::exit(0),
+ 
+ 
+                Event::KeyDown { keycode, .. } => {
+                    if let Some(key) = p1.get(&keycode.unwrap_or(Keycode::Ampersand)) {
+                        joypad1.set_button_pressed_status(*key, true);
+                    }
+                }
+                Event::KeyUp { keycode, .. } => {
+                    if let Some(key) = p1.get(&keycode.unwrap_or(Keycode::Ampersand)) {
+                        joypad1.set_button_pressed_status(*key, false);
+                    }
+                }
+
+                Event::ControllerButtonDown { button, .. } => {
+                    if let Some(button) = p2.get(&button) {
+                        joypad2.set_button_pressed_status(*button, true);
+                    }
+                }
+                Event::ControllerButtonUp { button, .. } => {
+                    if let Some(button) = p2.get(&button) {
+                        joypad2.set_button_pressed_status(*button, false);
+                    }
+                }
+ 
+                _ => { /* do nothing */ }
+            }
         }
-   });
+    });
 
-   let mut cpu = CPU::new(bus);
+    let mut cpu = CPU::new(bus);
 
-   cpu.reset();
-   cpu.run();
+    cpu.reset();
+    cpu.run();
 }
