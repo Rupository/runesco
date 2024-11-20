@@ -20,7 +20,7 @@ pub struct Bus<'call> {
     ppu: NesPPU,
     cycles: usize,
 
-    gameloop_callback: Box<dyn FnMut(&NesPPU, &mut Joypad, &mut Joypad) + 'call>,
+    gameloop_callback: Box<dyn FnMut(&NesPPU, /*&mut Joypad,*/ &mut Joypad) + 'call>,
 
     // Boxes: allow for data storage to the heap. Helpful when size is unknown (like in recursion!)
     // See: https://doc.rust-lang.org/book/ch15-01-box.html
@@ -40,13 +40,13 @@ pub struct Bus<'call> {
     // The Box makes it a heap-allocated, fixed-size pointer, which is necessary because dyn trait 
     // objects don’t have a known size at compile time, but pointers do!
 
-    joypad1: Joypad,
+    //joypad1: Joypad,
     joypad2: Joypad,
 }
 
 impl<'a> Bus<'a> { // can be any lifetime 'a
     pub fn new<'call, F>(rom: Rom, gameloop_callback: F) -> Bus<'call>
-    where F: FnMut(&NesPPU, &mut Joypad, &mut Joypad) + 'call,
+    where F: FnMut(&NesPPU, /*&mut Joypad,*/ &mut Joypad) + 'call,
     {
         let ppu = NesPPU::new(rom.chr_rom, rom.screen_mirroring);
 
@@ -56,7 +56,7 @@ impl<'a> Bus<'a> { // can be any lifetime 'a
             ppu: ppu,
             cycles: 0,
             gameloop_callback: Box::from(gameloop_callback),
-            joypad1 : Joypad::new(),
+            //joypad1 : Joypad::new(),
             joypad2 : Joypad::new(),
         }
     }
@@ -65,7 +65,7 @@ impl<'a> Bus<'a> { // can be any lifetime 'a
         self.cycles += cycles as usize;
         let new_frame = self.ppu.tick(cycles * 3);
         if new_frame {
-            (self.gameloop_callback)(&self.ppu, &mut self.joypad1, &mut self.joypad2);
+            (self.gameloop_callback)(&self.ppu, /*&mut self.joypad1,*/ &mut self.joypad2);
             // use the gameloop callback closure and pass a reference PPU to it
 
             // This is the state of the PPU after a screen is rendered (post NMI)
@@ -116,12 +116,22 @@ impl Mem for Bus<'_> {
                 0
             }
 
-            0x4016 => {
-                self.joypad1.read()
+            0x4017 => {
+                //println!("1R");
+                //self.joypad2.read()
+                //let x = self.joypad2.read();
+                //println!("Value of Read at 0x4016:{}",x);
+                //x
+                0
             }
 
-            0x4017 => {
+            0x4016 => {
+                //println!("2R");
+                //println!("Joypad1: {}, Joypad2: {}", self.joypad1.button_status.bits(), self.joypad2.button_status.bits());
                 self.joypad2.read()
+                //let x = self.joypad2.read();
+                //println!("Value of Read at 0x4017:{}",x);
+                //x
             }
 
             PRG..=PRG_END => self.read_prg_rom(addr),
@@ -213,11 +223,12 @@ impl Mem for Bus<'_> {
             }
 
             0x4016 => {
-                self.joypad1.write(data);
+                //self.joypad1.write(data);
+                self.joypad2.write(data);
             }
 
             0x4017 => {
-                self.joypad2.write(data);
+
             }
 
             _ => {

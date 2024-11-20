@@ -138,10 +138,10 @@ fn main() {
     .expect("No compatible game controller found");
 
     println!("Controller detected: {}", controller.name());
-    
+
     let window = video_subsystem
         .window(
-            "runesco: PAC-MAN (iNES)",
+            "runesco: Rust NES Co-Op",
             (256.0 * 3.0) as u32,
             (240.0 * 3.0) as u32,
         )
@@ -199,7 +199,7 @@ fn main() {
 
     // the game cycle
     let bus = Bus::new(rom, move 
-        |ppu: &NesPPU, joypad1: &mut joypads::Joypad, joypad2: &mut joypads::Joypad| {
+        |ppu: &NesPPU, /*joypad1: &mut joypads::Joypad,*/ joypad2: &mut joypads::Joypad| {
         render::render(ppu, &mut frame);
         // renders the current data from PPU and draws the current frame
 
@@ -221,25 +221,27 @@ fn main() {
  
                 Event::KeyDown { keycode, .. } => {
                     if let Some(key) = p1.get(&keycode.unwrap_or(Keycode::Ampersand)) {
-                        joypad1.set_button_pressed_status(*key, true);
+                        joypad2.set_button_pressed_status(*key, true);
                     }
                 }
                 Event::KeyUp { keycode, .. } => {
                     if let Some(key) = p1.get(&keycode.unwrap_or(Keycode::Ampersand)) {
-                        joypad1.set_button_pressed_status(*key, false);
+                        joypad2.set_button_pressed_status(*key, false);
                     }
                 }
 
-                Event::ControllerButtonDown { button, .. } => {
+                /*Event::ControllerButtonDown { button, .. } => {
                     if let Some(button) = p2.get(&button) {
                         joypad2.set_button_pressed_status(*button, true);
+                        //println!("Joypad 2 button pressed: {:?}", button);
                     }
                 }
                 Event::ControllerButtonUp { button, .. } => {
                     if let Some(button) = p2.get(&button) {
                         joypad2.set_button_pressed_status(*button, false);
+                        //println!("Joypad 2 button released`: {:?}", button);
                     }
-                }
+                }*/
  
                 _ => { /* do nothing */ }
             }
