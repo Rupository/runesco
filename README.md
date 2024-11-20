@@ -21,7 +21,7 @@ This emulator leverages **Rust** for its performance and reliability, alongside 
 
 - **WebAssembly**: Aims to ensure cross-platform compatibility by allowing the emulator to run directly in web browsers with near-native performance.  
 
-- **Multiplayer with Rollback Netplay**: Incorporates:  
+- **Multiplayer with Rollback Netplay**: Incorporates -
   - [Matchbox](https://github.com/johanhelsing/matchbox) for peer-to-peer connections.  
   - [GGRS](https://github.com/gschup/ggrs) for rollback netcode, ensuring low-latency synchronization of user inputs.  
 
