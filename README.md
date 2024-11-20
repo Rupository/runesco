@@ -12,7 +12,7 @@ This emulator leverages **Rust** for its performance and reliability, alongside 
 ---
 ### Key Features  
 
-- **Rust 🦀 **: The core of the project, chosen for its:  
+- **Rust 🦀:** The core of the project, chosen for its:  
   - **Performance**: Efficient and fast emulation.  
   - **Memory Safety**: Reduced debugging effort and runtime error prevention.  
   - **Concurrency**: Parallelism for tasks such as rendering and low-latency multiplayer.  
@@ -27,22 +27,22 @@ This emulator leverages **Rust** for its performance and reliability, alongside 
 
 ---
 ### Current Progress  
-##### Completed Goals:  
+#### Completed Goals:  
 - [x] **Core NES Emulator**: A fully functional emulator capable of running NES games.  
-##### Work in Progress:  
+#### Work in Progress:  
 - [ ] **Two-Player Local Multiplayer**: Developing support for a second joypad and player input.  
 
 ### Future Goals:  
-##### Feature Completeness:  
+#### Feature Completeness:  
 - [ ] **Audio Processing Unit (APU)**: Implementation of accurate sound emulation.  
 - [ ] **Support for Additional NES Mappers**: Expanding the range of compatible games.  
 - [ ] **iNES 2.0 Compatibility**: Enabling support for a broader variety of ROMs.  
 
-##### Online Multiplayer:  
+#### Online Multiplayer:  
 - [ ] **Fully Functional Online Multiplayer**: Integration of rollback netcode for synchronized multiplayer.  
 - [ ] **4+ Player Support**: Supporting cooperative and party-style games.  
 
-##### Cross-Platform Accessibility:  
+#### Cross-Platform Accessibility:  
 - [ ] **WebAssembly Compilation**: Allowing the emulator to run directly in modern web browsers.  
 
 ---
