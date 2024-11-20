@@ -38,7 +38,7 @@ This emulator leverages **Rust** for its performance and reliability, alongside 
 - [ ] **iNES 2.0 Compatibility**: Enabling support for a broader variety of ROMs.  
 
 #### Online Multiplayer:  
-- [ ] **Fully Functional Online Multiplayer**: Integration of rollback netcode for synchronized multiplayer.  
+- [ ] **Fully Functional Online Multiplayer**: Integration of rollback netplay for synchronized multiplayer.  
 - [ ] **4+ Player Support**: Supporting cooperative and party-style games.  
 
 #### Cross-Platform Accessibility:  
