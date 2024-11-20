@@ -30,26 +30,19 @@ impl Joypad {
     }
 
     pub fn write(&mut self, data: u8) {
-        //println!("Current Status: {}", self.button_status.bits);
-        //println!("Button Status in Write: {}", self.button_status.bits);
         self.strobe = data & 1 == 1; // set strobe mode to on if bit 1 of data is set
-        //println!("Joypad strobe mode: {}", self.strobe);
         if self.strobe { // if it is to be on,
             self.button_index = 0 // initialise the button pointer for reads.
         }
     }
 
     pub fn read(&mut self) -> u8 {
-        //println!("Button Pointer: {}", self.button_index);
         if self.button_index > 7 { // if button pointer exceeds, a read on an NES will always keep returning 1
-            //println!("Joypad read: Button {} state: {} given button status {}", self.button_index, 1, self.button_status.bits);
-            //println!("Testing");
             return 1;
         }
 
         // otherwise...
         let response = (self.button_status.bits & (1 << self.button_index)) >> self.button_index;
-        //println!("Joypad read: Button {} state: {} given button status {}", self.button_index, response, self.button_status.bits);
 
         // self.button_status.bits & (1 << self.button_index) isolates the bit corresponding to the current button 
         // (A = index 0, B = index 1, and so on) from button_status.bits.
@@ -65,17 +58,11 @@ impl Joypad {
 
         if !self.strobe && self.button_index <= 7 { // if strobe mode is off and button pointer is in a valid read range
             self.button_index += 1; // increment the button pointer
-        }
-        //println!("Response: {} for button index: {}", response, self.button_index);
+        }   
         response // and return the response
     }
 
     pub fn set_button_pressed_status(&mut self, button: JoypadButton, pressed: bool) {
         self.button_status.set(button, pressed);
-        //println!("Button {:?} with status {} is now {}", button, self.button_status.bits, pressed);
     }
-
-    /*pub fn select_joypad(&mut self, data: u8) -> u8 {
-        
-    }*/
 }
