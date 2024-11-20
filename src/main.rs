@@ -166,7 +166,7 @@ fn main() {
     // We specify that the visuals are in the form of 256 x 240 pixel grid
 
     //load the game
-    let nes_file_data: Vec<u8> = std::fs::read("donkeykong.nes").unwrap();
+    let nes_file_data: Vec<u8> = std::fs::read("pacman.nes").unwrap();
     let rom = Rom::new(&nes_file_data).unwrap();
 
     let mut frame = Frame::new();
@@ -219,7 +219,7 @@ fn main() {
                 } => std::process::exit(0),
  
  
-                Event::KeyDown { keycode, .. } => {
+                /*Event::KeyDown { keycode, .. } => {
                     if let Some(key) = p1.get(&keycode.unwrap_or(Keycode::Ampersand)) {
                         joypad2.set_button_pressed_status(*key, true);
                     }
@@ -228,9 +228,9 @@ fn main() {
                     if let Some(key) = p1.get(&keycode.unwrap_or(Keycode::Ampersand)) {
                         joypad2.set_button_pressed_status(*key, false);
                     }
-                }
+                }*/
 
-                /*Event::ControllerButtonDown { button, .. } => {
+                Event::ControllerButtonDown { button, .. } => {
                     if let Some(button) = p2.get(&button) {
                         joypad2.set_button_pressed_status(*button, true);
                         //println!("Joypad 2 button pressed: {:?}", button);
@@ -241,7 +241,7 @@ fn main() {
                         joypad2.set_button_pressed_status(*button, false);
                         //println!("Joypad 2 button released`: {:?}", button);
                     }
-                }*/
+                }
  
                 _ => { /* do nothing */ }
             }
