@@ -70,25 +70,24 @@ let nes_file_data: Vec<u8> = std::fs::read("<name_of_your_rom>.nes").unwrap();
 ```
 
 4. Check the control configuration:
-	- By default, 
-		- Player 1:
-			- A - Z
-			- B - X
-			- Select - Right Shift
-			- Start - Enter
-			- $\uparrow$ - Up Arrow Key
-			- $\downarrow$ - Down Arrow Key
-			- $\leftarrow$ - Left Arrow Key
-			- $\rightarrow$ - Right Arrow Key
-		-  Player 2:
-			- A - XBox 360 (or equivalent Controller) A
-			- B - Controller B
-			- Select - Controller Back
-			- Start - Controller Up
-			- $\uparrow$ - Controller DPad Up
-			- $\downarrow$ - Controller DPad Down
-			- $\leftarrow$ - Controller DPad Left
-			- $\rightarrow$ - Controller DPad Right
+	- Player 1:
+		- A - Z
+		- B - X
+		- Select - Right Shift
+		- Start - Enter
+		- $\uparrow$ - Up Arrow Key
+		- $\downarrow$ - Down Arrow Key
+		- $\leftarrow$ - Left Arrow Key
+		- $\rightarrow$ - Right Arrow Key
+	-  Player 2:
+		- A - XBox 360 (or equivalent Controller) A
+		- B - Controller B
+		- Select - Controller Back
+		- Start - Controller Up
+		- $\uparrow$ - Controller DPad Up
+		- $\downarrow$ - Controller DPad Down
+		- $\leftarrow$ - Controller DPad Left
+		- $\rightarrow$ - Controller DPad Right
 	- To remap these bindings, in main.rs, you may edit the following lines (174 - 192)
 
 ```
