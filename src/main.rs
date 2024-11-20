@@ -166,7 +166,7 @@ fn main() {
     // We specify that the visuals are in the form of 256 x 240 pixel grid
 
     //load the game
-    let nes_file_data: Vec<u8> = std::fs::read("balloonfight.nes").unwrap();
+    let nes_file_data: Vec<u8> = std::fs::read("nestest.nes").unwrap();
     let rom = Rom::new(&nes_file_data).unwrap();
 
     let mut frame = Frame::new();
