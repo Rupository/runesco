@@ -29,8 +29,7 @@ This emulator leverages **Rust** for its performance and reliability, alongside 
 ### Current Progress  
 #### Completed Goals:  
 - [x] **Core NES Emulator**: A fully functional emulator capable of running NES games.  
-#### Work in Progress:  
-- [ ] **Two-Player Local Multiplayer**: Developing support for a second joypad and player input.  
+- [x] **Two-Player Local Multiplayer**: Developing support for a second joypad and player input.  
 
 ### Future Goals:  
 #### Feature Completeness:  
@@ -61,7 +60,7 @@ cd ruNESco
 cargo build --release
 ```
 
-3. **Load the Rom:**
+3. **Load the rom:**
 	- You will have to provide the .nes ROM file.
 	- Place it in the runesco folder: the same location SDL2.dll is stored in
 	- Navigate to the "src" folder, and update line 169 of main.rs to the name of your rom.
@@ -70,7 +69,52 @@ cargo build --release
 let nes_file_data: Vec<u8> = std::fs::read("<name_of_your_rom>.nes").unwrap();
 ```
 
-4. **Run the Emulator:**
+4. Check the control configuration:
+	- By default, 
+		- Player 1:
+			- A - Z
+			- B - X
+			- Select - Right Shift
+			- Start - Enter
+			- $\uparrow$ - Up Arrow Key
+			- $\downarrow$ - Down Arrow Key
+			- $\leftarrow$ - Left Arrow Key
+			- $\rightarrow$ - Right Arrow Key
+		-  Player 2:
+			- A - XBox 360 (or equivalent Controller) A
+			- B - Controller B
+			- Select - Controller Back
+			- Start - Controller Up
+			- $\uparrow$ - Controller DPad Up
+			- $\downarrow$ - Controller DPad Down
+			- $\leftarrow$ - Controller DPad Left
+			- $\rightarrow$ - Controller DPad Right
+	- To remap these bindings, in main.rs, you may edit the following lines (174 - 192)
+
+```
+let mut p1 = HashMap::new();
+    p1.insert(Keycode::Down, joypads::JoypadButton::DOWN);
+    p1.insert(Keycode::Up, joypads::JoypadButton::UP);
+    p1.insert(Keycode::Right, joypads::JoypadButton::RIGHT);
+    p1.insert(Keycode::Left, joypads::JoypadButton::LEFT);
+    p1.insert(Keycode::RShift, joypads::JoypadButton::SELECT);
+    p1.insert(Keycode::Return, joypads::JoypadButton::START);
+    p1.insert(Keycode::Z, joypads::JoypadButton::BUTTON_A);
+    p1.insert(Keycode::X, joypads::JoypadButton::BUTTON_B);
+
+    let mut p2 = HashMap::new();
+    p2.insert(Button::DPadDown, joypads::JoypadButton::DOWN);
+    p2.insert(Button::DPadUp, joypads::JoypadButton::UP);
+    p2.insert(Button::DPadRight, joypads::JoypadButton::RIGHT);
+    p2.insert(Button::DPadLeft, joypads::JoypadButton::LEFT);
+    p2.insert(Button::Back, joypads::JoypadButton::SELECT);
+    p2.insert(Button::Start, joypads::JoypadButton::START);
+    p2.insert(Button::A, joypads::JoypadButton::BUTTON_A);
+    p2.insert(Button::B, joypads::JoypadButton::BUTTON_B);
+
+```
+
+5. **Run the emulator:**
    
 ```
 cargo run --release
