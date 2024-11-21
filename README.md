@@ -19,9 +19,9 @@ This emulator leverages **Rust** for its performance and reliability, alongside 
 
 - **[Rust-SDL2](https://github.com/Rust-SDL2/rust-sdl2)**: Enables visual rendering via the Picture Processing Unit (PPU), with plans for future audio support through the Audio Processing Unit (APU).  
 
-- **WebAssembly**: Aims to ensure cross-platform compatibility by allowing the emulator to run directly in web browsers with near-native performance.  
+- **WebAssembly** (WIP): Aims to ensure cross-platform compatibility by allowing the emulator to run directly in web browsers with near-native performance.  
 
-- **Multiplayer with Rollback Netplay**: Incorporates -
+- **Multiplayer with Rollback Netplay** (WIP): Incorporates -
   - [Matchbox](https://github.com/johanhelsing/matchbox) for peer-to-peer connections.  
   - [GGRS](https://github.com/gschup/ggrs) for rollback netcode, ensuring low-latency synchronization of user inputs.  
 
@@ -29,7 +29,7 @@ This emulator leverages **Rust** for its performance and reliability, alongside 
 ### Current Progress  
 #### Completed Goals:  
 - [x] **Core NES Emulator**: A fully functional emulator capable of running NES games.  
-- [x] **Two-Player Local Multiplayer**: Developing support for a second joypad and player input.  
+- [x] **Two-Player Local Multiplayer**: Developed support for a second joypad and player input.  
 
 ### Future Goals:  
 #### Feature Completeness:  
