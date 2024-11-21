@@ -91,7 +91,7 @@ let nes_file_data: Vec<u8> = std::fs::read("<name_of_your_rom>.nes").unwrap();
 	- To remap these bindings, in main.rs, you may edit the following lines (174 - 192)
 
 ```
-let mut p1 = HashMap::new();
+    let mut p1 = HashMap::new();
     p1.insert(Keycode::Down, joypads::JoypadButton::DOWN);
     p1.insert(Keycode::Up, joypads::JoypadButton::UP);
     p1.insert(Keycode::Right, joypads::JoypadButton::RIGHT);
