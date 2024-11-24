@@ -94,6 +94,10 @@ impl NesPPU {
         return false;
     }
 
+    pub fn poll_nmi_interrupt(&mut self) -> Option<u8> {
+        self.nmi_interrupt.take()
+    }
+
     fn is_sprite_0_hit(&self, cycle: usize) -> bool {
         let y = self.oam_data[0] as usize;
         let x = self.oam_data[3] as usize;

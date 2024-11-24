@@ -63,14 +63,16 @@ impl<'a> Bus<'a> { // can be any lifetime 'a
 
     pub fn tick(&mut self, cycles: u8) {
         self.cycles += cycles as usize;
-        let new_frame = self.ppu.tick(cycles * 3);
-        if new_frame {
+        let nmi_before = self.ppu.nmi_interrupt.is_some();
+        self.ppu.tick(cycles *3);
+        let nmi_after = self.ppu.nmi_interrupt.is_some();
+        
+        if !nmi_before && nmi_after {
             (self.gameloop_callback)(&self.ppu, &mut self.joypad1, &mut self.joypad2);
-            // use the gameloop callback closure and pass a reference PPU to it
-
-            // This is the state of the PPU after a screen is rendered (post NMI)
-            // after which the data in it is used to render the frame.
         }
+
+        // If an NMI has just been triggered (i.e., the NMI flag was false before and is true now), the function calls gameloop_callback
+        // to render the next frame.
     }
 
     pub fn poll_nmi_status(&mut self) -> Option<u8> {
