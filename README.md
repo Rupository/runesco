@@ -4,7 +4,7 @@ An emulator for the [Nintendo Entertainment System (NES)](https://en.wikipedia.o
 
 Project Poster (made with Canva):
 
-![ruNESco poster](https://drive.google.com/file/d/1FQMdaNoGph3R_1jb5Qd6WuzlaPh1p51r/view?usp=drive_link)
+![ruNESco poster](https://github.com/Rupository/runesco/blob/main/ruNEScoPoster.png?raw=true)
 
 ---
 ### Introduction  
