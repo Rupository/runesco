@@ -1,6 +1,11 @@
 # ruNESco 🕹️  
 
-An emulator for the [Nintendo Entertainment System (NES)](https://en.wikipedia.org/wiki/Nintendo_Entertainment_System) written in [Rust](https://www.rust-lang.org/), with a focus on **online cooperative multiplayer** over the web.  
+An emulator for the [Nintendo Entertainment System (NES)](https://en.wikipedia.org/wiki/Nintendo_Entertainment_System) written in [Rust](https://www.rust-lang.org/), with a focus on **online cooperative multiplayer** over the web.
+
+Project Poster (made with Canva)
+
+![[ruNESco Poster.png]]
+
 
 ---
 ### Introduction  
