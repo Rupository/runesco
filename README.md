@@ -12,7 +12,7 @@ Project Poster (made with Canva)
 
 ruNESco was inspired by a fascination with emulation and retro gaming, and a desire to stay connected during the global pandemic. The project seeks to recreate the experience of classic NES games, enhanced by the ability to play with friends, even across long distances.
 
-This emulator leverages **Rust** for its performance and reliability, alongside modern technologies such as **SDL2**, **WebAssembly**, and rollback networking to provide a seamless multiplayer retro gaming experience.
+This emulator leverages **Rust** for its performance and reliability, alongside **SDL2**, **WebAssembly**, and rollback networking to provide a seamless multiplayer retro gaming experience.
 
 ---
 ### Key Features  
