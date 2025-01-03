@@ -2,10 +2,9 @@
 
 An emulator for the [Nintendo Entertainment System (NES)](https://en.wikipedia.org/wiki/Nintendo_Entertainment_System) written in [Rust](https://www.rust-lang.org/), with a focus on **online cooperative multiplayer** over the web.
 
-Project Poster (made with Canva)
+Project Poster (made with Canva):
 
-![[ruNESco Poster.png]]
-
+![ruNESco poster](https://drive.google.com/file/d/1FQMdaNoGph3R_1jb5Qd6WuzlaPh1p51r/view?usp=drive_link)
 
 ---
 ### Introduction  
